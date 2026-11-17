@@ -41,19 +41,19 @@
     <aside class="controls"><strong>CONTROLS</strong><br />Move: <strong>W A S D</strong><br />Aim: <strong>Arrow keys</strong> (diagonal too)<br />Shoot: <strong>Space</strong></aside>
   </section>
   <section class="death-screen hidden" id="deathScreen" aria-label="You died"><div class="death-card"><h2 class="death-title">You Died</h2><button class="back-button" id="backButton" type="button">Back to Menu</button></div></section>
-
   <script>
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
     const TILE_SIZE = 16;
     const PLAYER_MAX_HP = 100;
     const ZOMBIE_AGGRO_RANGE = TILE_SIZE * 5;
-    const ZOMBIE_SPAWN_INTERVAL = 10;
+    const ZOMBIE_SPAWN_INTERVAL = 5;
     const MEDKIT_SPAWN_INTERVAL = 7.5;
     const MEDKIT_HEAL = 50;
     const ZOMBIE_DAMAGE = 25;
     const BULLET_DAMAGE = 20;
     const ZOMBIE_KNOCKBACK = TILE_SIZE * 2;
+    const MAX_MEDKITS = 6;
     let W = 320, H = 180, WORLD_WIDTH = 2400, WORLD_HEIGHT = 1800;
     let gameStarted = false, zombieSpawnTimer = 0, medkitSpawnTimer = 0;
     const player = { x: 1200, y: 900, speed: 78, hp: PLAYER_MAX_HP, invulnerable: 0 };
@@ -91,15 +91,17 @@
       return {x:TILE_SIZE*2 + Math.random()*(WORLD_WIDTH-TILE_SIZE*4), y:TILE_SIZE*2 + Math.random()*(WORLD_HEIGHT-TILE_SIZE*4)};
     }
     function spawnZombie() {
-      let point;
+      let point = null;
       for (let n=0;n<80;n++) {
         const p=randomWorldPoint();
         if (Math.hypot(p.x-player.x,p.y-player.y)>TILE_SIZE*8 && zombies.every(z=>Math.hypot(p.x-z.x,p.y-z.y)>TILE_SIZE*6)) { point=p; break; }
       }
-      zombies.push(makeZombie((point||randomWorldPoint()).x,(point||randomWorldPoint()).y));
+      if (!point) point=randomWorldPoint();
+      zombies.push(makeZombie(point.x,point.y));
     }
     function spawnMedkit() {
-      let point;
+      if (medkits.length >= MAX_MEDKITS) return;
+      let point = null;
       for (let n=0;n<80;n++) {
         const p=randomWorldPoint();
         if (Math.hypot(p.x-player.x,p.y-player.y)>TILE_SIZE*5 && medkits.every(m=>Math.hypot(p.x-m.x,p.y-m.y)>TILE_SIZE*5)) { point=p; break; }
@@ -113,18 +115,16 @@
         audioContext ||= new AudioContextClass();
         if (audioContext.state === "suspended") audioContext.resume();
         const now = audioContext.currentTime;
-        [660, 880].forEach((frequency, index) => {
-          const oscillator = audioContext.createOscillator();
-          const gain = audioContext.createGain();
-          oscillator.type = "sine";
-          oscillator.frequency.setValueAtTime(frequency, now + index * 0.09);
-          gain.gain.setValueAtTime(0.0001, now + index * 0.09);
-          gain.gain.exponentialRampToValueAtTime(0.16, now + index * 0.09 + 0.015);
-          gain.gain.exponentialRampToValueAtTime(0.0001, now + index * 0.09 + 0.18);
+        [660, 880].forEach((frequency,index)=>{
+          const oscillator=audioContext.createOscillator(), gain=audioContext.createGain();
+          oscillator.type="sine"; oscillator.frequency.setValueAtTime(frequency,now+index*.09);
+          gain.gain.setValueAtTime(.0001,now+index*.09);
+          gain.gain.exponentialRampToValueAtTime(.16,now+index*.09+.015);
+          gain.gain.exponentialRampToValueAtTime(.0001,now+index*.09+.18);
           oscillator.connect(gain); gain.connect(audioContext.destination);
-          oscillator.start(now + index * 0.09); oscillator.stop(now + index * 0.09 + 0.19);
+          oscillator.start(now+index*.09); oscillator.stop(now+index*.09+.19);
         });
-      } catch (error) { console.warn("Could not play medkit pickup sound.", error); }
+      } catch (error) { console.warn("Could not play medkit pickup sound.",error); }
     }
     function resetGame() {
       player.x=1200; player.y=900; player.hp=PLAYER_MAX_HP; player.invulnerable=0;
@@ -159,8 +159,8 @@
     function damagePlayer(zombie) {
       if(player.invulnerable>0||player.hp<=0) return;
       player.hp=Math.max(0,player.hp-ZOMBIE_DAMAGE); player.invulnerable=.8;
-      let dx=player.x-zombie.x,dy=player.y-zombie.y,len=Math.hypot(dx,dy)||1;
-      if(!Math.hypot(dx,dy)){dx=1;dy=0;}
+      let dx=player.x-zombie.x,dy=player.y-zombie.y,len=Math.hypot(dx,dy);
+      if(len===0){dx=1;dy=0;len=1;}
       player.x=Math.max(14,Math.min(WORLD_WIDTH-14,player.x+dx/len*ZOMBIE_KNOCKBACK));
       player.y=Math.max(14,Math.min(WORLD_HEIGHT-14,player.y+dy/len*ZOMBIE_KNOCKBACK)); updateHealthDisplay();
       if(player.hp<=0){keys.clear();gameStarted=false;deathScreen.classList.remove("hidden");}
@@ -172,7 +172,8 @@
         if(dx&&dy){dx*=Math.SQRT1_2;dy*=Math.SQRT1_2;}
         player.x=Math.max(14,Math.min(WORLD_WIDTH-14,player.x+dx*player.speed*dt));
         player.y=Math.max(14,Math.min(WORLD_HEIGHT-14,player.y+dy*player.speed*dt));
-        zombieSpawnTimer+=dt; if(zombieSpawnTimer>=ZOMBIE_SPAWN_INTERVAL){zombieSpawnTimer-=ZOMBIE_SPAWN_INTERVAL;spawnZombie();}
+        zombieSpawnTimer+=dt;
+        while(zombieSpawnTimer>=ZOMBIE_SPAWN_INTERVAL){zombieSpawnTimer-=ZOMBIE_SPAWN_INTERVAL;spawnZombie();}
         medkitSpawnTimer+=dt;
         while(medkitSpawnTimer>=MEDKIT_SPAWN_INTERVAL){medkitSpawnTimer-=MEDKIT_SPAWN_INTERVAL;spawnMedkit();}
         for(const z of zombies) {
