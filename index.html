@@ -38,7 +38,7 @@
   <div class="hud hidden" id="hud" aria-live="polite"><span id="healthText">100 hp</span><div class="health-track"><div class="health-fill" id="healthFill"></div></div></div>
   <section class="menu" id="menu" aria-label="Main menu">
     <div class="menu-card"><h1>Pixel<br />Survivor</h1><p class="tagline">A zombie is out there. Keep your distance!</p><div class="menu-buttons"><button id="startButton" type="button">Start Game</button><button type="button" disabled aria-disabled="true">Weapons <span class="coming-soon">Coming soon</span></button></div></div>
-    <aside class="controls"><strong>CONTROLS</strong><br />Move: <strong>W A S D</strong><br />Aim: <strong>Arrow keys</strong> (diagonal too)<br />Shoot: <strong>Space</strong></aside>
+    <aside class="controls"><strong>CONTROLS</strong><br />Move: <strong>W A S D</strong><br />Aim: <strong>Mouse or arrow keys</strong> (diagonal too)<br />Shoot: <strong>Space</strong></aside>
   </section>
   <section class="death-screen hidden" id="deathScreen" aria-label="You died"><div class="death-card"><h2 class="death-title">You Died</h2><button class="back-button" id="backButton" type="button">Back to Menu</button></div></section>
   <script>
@@ -48,11 +48,13 @@
     const ZOMBIE_AGGRO_RANGE = TILE_SIZE * 10, ZOMBIE_SPAWN_INTERVAL = 5;
     const MEDKIT_SPAWN_INTERVAL = 7.5, MEDKIT_HEAL = 50;
     const ZOMBIE_DAMAGE = 25, BULLET_DAMAGE = 20, ZOMBIE_KNOCKBACK = TILE_SIZE * 2;
+    const BULLET_RANGE_MULTIPLIER = 5, BULLET_LIFETIME = 0.65 * BULLET_RANGE_MULTIPLIER;
+    const ZOMBIE_HIT_FLASH_TIME = 0.2;
     let W = 320, H = 180, WORLD_WIDTH = 2400, WORLD_HEIGHT = 1800;
     let gameStarted = false, zombieSpawnTimer = 0, medkitSpawnTimer = 0;
     const player = { x: 1200, y: 900, speed: 78, hp: PLAYER_MAX_HP, invulnerable: 0 };
     let zombies = [], medkits = [];
-    const bullets = [], keys = new Set(), aim = { x: 1, y: 0 };
+    const bullets = [], keys = new Set(), aim = { x: 1, y: 0 }, mouseAim = { x: 1, y: 0 };
     let lastTime = 0, lastShot = 0, audioContext = null;
     const healthText = document.getElementById("healthText"), healthFill = document.getElementById("healthFill");
     const menu = document.getElementById("menu"), hud = document.getElementById("hud"), deathScreen = document.getElementById("deathScreen");
@@ -78,22 +80,12 @@
       ctx.imageSmoothingEnabled = false;
     }
     addEventListener("resize", resizeCanvas); resizeCanvas();
-    function makeZombie(x, y) { return {x,y,speed:38,hp:100,chasing:false,attackCooldown:0}; }
-
-    // Uniform random positions across the entire playable world (inside its edge).
+    function makeZombie(x, y) { return {x,y,speed:38,hp:100,chasing:false,attackCooldown:0,hitFlash:0}; }
     function randomWorldPoint() {
-      return { x: TILE_SIZE + Math.random() * (WORLD_WIDTH - TILE_SIZE * 2),
-               y: TILE_SIZE + Math.random() * (WORLD_HEIGHT - TILE_SIZE * 2) };
+      return { x: TILE_SIZE + Math.random() * (WORLD_WIDTH - TILE_SIZE * 2), y: TILE_SIZE + Math.random() * (WORLD_HEIGHT - TILE_SIZE * 2) };
     }
-    function spawnZombie() {
-      const point = randomWorldPoint();
-      zombies.push(makeZombie(point.x, point.y));
-    }
-    function spawnMedkit() {
-      // No field cap or distance/spacing restrictions: medkits can appear anywhere on the map.
-      const point = randomWorldPoint();
-      medkits.push(point);
-    }
+    function spawnZombie() { const point=randomWorldPoint(); zombies.push(makeZombie(point.x,point.y)); }
+    function spawnMedkit() { const point=randomWorldPoint(); medkits.push(point); }
     function playPickupSound() {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       if (!AudioContextClass) return;
@@ -104,18 +96,16 @@
         [660, 880].forEach((frequency,index)=>{
           const oscillator=audioContext.createOscillator(), gain=audioContext.createGain();
           oscillator.type="sine"; oscillator.frequency.setValueAtTime(frequency,now+index*.09);
-          gain.gain.setValueAtTime(.0001,now+index*.09);
-          gain.gain.exponentialRampToValueAtTime(.16,now+index*.09+.015);
+          gain.gain.setValueAtTime(.0001,now+index*.09); gain.gain.exponentialRampToValueAtTime(.16,now+index*.09+.015);
           gain.gain.exponentialRampToValueAtTime(.0001,now+index*.09+.18);
-          oscillator.connect(gain); gain.connect(audioContext.destination);
-          oscillator.start(now+index*.09); oscillator.stop(now+index*.09+.19);
+          oscillator.connect(gain); gain.connect(audioContext.destination); oscillator.start(now+index*.09); oscillator.stop(now+index*.09+.19);
         });
       } catch (error) { console.warn("Could not play medkit pickup sound.",error); }
     }
     function resetGame() {
       player.x=1200; player.y=900; player.hp=PLAYER_MAX_HP; player.invulnerable=0;
       zombies=[makeZombie(1304,900)]; medkits=[]; zombieSpawnTimer=0; medkitSpawnTimer=0;
-      bullets.length=0; keys.clear(); aim.x=1; aim.y=0; lastShot=0; updateHealthDisplay();
+      bullets.length=0; keys.clear(); aim.x=1; aim.y=0; mouseAim.x=1; mouseAim.y=0; lastShot=0; updateHealthDisplay();
     }
     document.getElementById("startButton").addEventListener("click",()=>{
       resetGame(); gameStarted=true; menu.classList.add("hidden"); deathScreen.classList.add("hidden"); hud.classList.remove("hidden");
@@ -123,11 +113,22 @@
     document.getElementById("backButton").addEventListener("click",()=>{
       gameStarted=false; resetGame(); deathScreen.classList.add("hidden"); hud.classList.add("hidden"); menu.classList.remove("hidden");
     });
+    function pointerAim(event) {
+      const rect=canvas.getBoundingClientRect();
+      const camera=getCamera();
+      const worldX=camera.x+(event.clientX-rect.left)*W/rect.width;
+      const worldY=camera.y+(event.clientY-rect.top)*H/rect.height;
+      const dx=worldX-player.x, dy=worldY-player.y, length=Math.hypot(dx,dy);
+      if(length>0){mouseAim.x=dx/length;mouseAim.y=dy/length;if(!hasArrowAim()) {aim.x=mouseAim.x;aim.y=mouseAim.y;}}
+    }
+    canvas.addEventListener("pointermove",pointerAim);
+    function hasArrowAim(){return keys.has("arrowleft")||keys.has("arrowright")||keys.has("arrowup")||keys.has("arrowdown");}
     function updateAimFromKeys() {
       let x=0,y=0;
       if(keys.has("arrowleft")) x--; if(keys.has("arrowright")) x++;
       if(keys.has("arrowup")) y--; if(keys.has("arrowdown")) y++;
       if(x||y) { const len=Math.hypot(x,y); aim.x=x/len; aim.y=y/len; }
+      else { aim.x=mouseAim.x; aim.y=mouseAim.y; }
     }
     addEventListener("keydown",event=>{
       const key=event.key.toLowerCase();
@@ -140,28 +141,26 @@
     addEventListener("blur",()=>keys.clear());
     function shoot() {
       const now=performance.now(); if(now-lastShot<180) return; lastShot=now;
-      bullets.push({x:player.x+aim.x*11,y:player.y+aim.y*11,vx:aim.x*190,vy:aim.y*190,life:.65});
+      bullets.push({x:player.x+aim.x*11,y:player.y+aim.y*11,vx:aim.x*190,vy:aim.y*190,life:BULLET_LIFETIME});
     }
     function damagePlayer(zombie) {
       if(player.invulnerable>0||player.hp<=0) return;
       player.hp=Math.max(0,player.hp-ZOMBIE_DAMAGE); player.invulnerable=.8;
-      let dx=player.x-zombie.x,dy=player.y-zombie.y,len=Math.hypot(dx,dy);
-      if(len===0){dx=1;dy=0;len=1;}
+      let dx=player.x-zombie.x,dy=player.y-zombie.y,len=Math.hypot(dx,dy); if(len===0){dx=1;dy=0;len=1;}
       player.x=Math.max(14,Math.min(WORLD_WIDTH-14,player.x+dx/len*ZOMBIE_KNOCKBACK));
       player.y=Math.max(14,Math.min(WORLD_HEIGHT-14,player.y+dy/len*ZOMBIE_KNOCKBACK)); updateHealthDisplay();
       if(player.hp<=0){keys.clear();gameStarted=false;deathScreen.classList.remove("hidden");}
     }
     function update(dt) {
       if(player.invulnerable>0) player.invulnerable=Math.max(0,player.invulnerable-dt);
+      for(const z of zombies) z.hitFlash=Math.max(0,z.hitFlash-dt);
       if(gameStarted&&player.hp>0) {
         let dx=0,dy=0; if(keys.has("a"))dx--;if(keys.has("d"))dx++;if(keys.has("w"))dy--;if(keys.has("s"))dy++;
         if(dx&&dy){dx*=Math.SQRT1_2;dy*=Math.SQRT1_2;}
         player.x=Math.max(14,Math.min(WORLD_WIDTH-14,player.x+dx*player.speed*dt));
         player.y=Math.max(14,Math.min(WORLD_HEIGHT-14,player.y+dy*player.speed*dt));
-        zombieSpawnTimer+=dt;
-        while(zombieSpawnTimer>=ZOMBIE_SPAWN_INTERVAL){zombieSpawnTimer-=ZOMBIE_SPAWN_INTERVAL;spawnZombie();}
-        medkitSpawnTimer+=dt;
-        while(medkitSpawnTimer>=MEDKIT_SPAWN_INTERVAL){medkitSpawnTimer-=MEDKIT_SPAWN_INTERVAL;spawnMedkit();}
+        zombieSpawnTimer+=dt; while(zombieSpawnTimer>=ZOMBIE_SPAWN_INTERVAL){zombieSpawnTimer-=ZOMBIE_SPAWN_INTERVAL;spawnZombie();}
+        medkitSpawnTimer+=dt; while(medkitSpawnTimer>=MEDKIT_SPAWN_INTERVAL){medkitSpawnTimer-=MEDKIT_SPAWN_INTERVAL;spawnMedkit();}
         for(const z of zombies) {
           if(z.hp<=0) continue; z.attackCooldown=Math.max(0,z.attackCooldown-dt);
           const vx=player.x-z.x,vy=player.y-z.y,distance=Math.hypot(vx,vy); z.chasing=distance<=ZOMBIE_AGGRO_RANGE;
@@ -169,15 +168,13 @@
           else if(distance<=18&&z.attackCooldown<=0){damagePlayer(z);z.attackCooldown=1;if(player.hp<=0)break;}
         }
         if(player.hp<PLAYER_MAX_HP) for(let i=medkits.length-1;i>=0;i--) {
-          const m=medkits[i]; if(Math.hypot(player.x-m.x,player.y-m.y)<14) {
-            player.hp=Math.min(PLAYER_MAX_HP,player.hp+MEDKIT_HEAL);medkits.splice(i,1);updateHealthDisplay();playPickupSound();
-          }
+          const m=medkits[i]; if(Math.hypot(player.x-m.x,player.y-m.y)<14) {player.hp=Math.min(PLAYER_MAX_HP,player.hp+MEDKIT_HEAL);medkits.splice(i,1);updateHealthDisplay();playPickupSound();}
         }
       }
       for(let i=bullets.length-1;i>=0;i--) {
         const b=bullets[i];b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;
         const hit=zombies.find(z=>z.hp>0&&Math.hypot(b.x-z.x,b.y-z.y)<11);
-        if(hit){hit.hp=Math.max(0,hit.hp-BULLET_DAMAGE);bullets.splice(i,1);continue;}
+        if(hit){hit.hp=Math.max(0,hit.hp-BULLET_DAMAGE);hit.hitFlash=ZOMBIE_HIT_FLASH_TIME;bullets.splice(i,1);continue;}
         if(b.life<=0||b.x<0||b.x>WORLD_WIDTH||b.y<0||b.y>WORLD_HEIGHT)bullets.splice(i,1);
       }
     }
@@ -187,24 +184,20 @@
       const sx=Math.floor(camera.x/TILE_SIZE)*TILE_SIZE,sy=Math.floor(camera.y/TILE_SIZE)*TILE_SIZE;
       for(let wy=sy;wy<camera.y+H+TILE_SIZE;wy+=TILE_SIZE)for(let wx=sx;wx<camera.x+W+TILE_SIZE;wx+=TILE_SIZE)
         if(((wx/TILE_SIZE)+(wy/TILE_SIZE))%2===0){ctx.fillStyle="#587348";ctx.fillRect(wx-camera.x,wy-camera.y,TILE_SIZE,TILE_SIZE);}
-      ctx.fillStyle="#26372a";
-      if(camera.y===0)ctx.fillRect(0,0,W,8);if(camera.y+H>=WORLD_HEIGHT)ctx.fillRect(0,H-8,W,8);
-      if(camera.x===0)ctx.fillRect(0,0,8,H);if(camera.x+W>=WORLD_WIDTH)ctx.fillRect(W-8,0,8,H);
-      for(const p of plants){const x=p.x-camera.x,y=p.y-camera.y;if(x< -12||x>W+12||y< -12||y>H+12)continue;
-        ctx.fillStyle="#304733";ctx.fillRect(x-4,y+3,10,5);ctx.fillStyle="#83a95b";ctx.fillRect(x,y-3,4,8);ctx.fillRect(x-4,y,4,4);ctx.fillRect(x+4,y-1,4,4);ctx.fillStyle="#b1c96b";ctx.fillRect(x,y-5,3,3);}
+      ctx.fillStyle="#26372a"; if(camera.y===0)ctx.fillRect(0,0,W,8);if(camera.y+H>=WORLD_HEIGHT)ctx.fillRect(0,H-8,W,8);if(camera.x===0)ctx.fillRect(0,0,8,H);if(camera.x+W>=WORLD_WIDTH)ctx.fillRect(W-8,0,8,H);
+      for(const p of plants){const x=p.x-camera.x,y=p.y-camera.y;if(x< -12||x>W+12||y< -12||y>H+12)continue;ctx.fillStyle="#304733";ctx.fillRect(x-4,y+3,10,5);ctx.fillStyle="#83a95b";ctx.fillRect(x,y-3,4,8);ctx.fillRect(x-4,y,4,4);ctx.fillRect(x+4,y-1,4,4);ctx.fillStyle="#b1c96b";ctx.fillRect(x,y-5,3,3);}
     }
-    function drawMedkits(camera){for(const m of medkits){const x=Math.round(m.x-camera.x),y=Math.round(m.y-camera.y);if(x< -12||x>W+12||y< -12||y>H+12)continue;
-      ctx.fillStyle="#263329";ctx.fillRect(x-7,y-5,15,12);ctx.fillStyle="#f2f1df";ctx.fillRect(x-6,y-6,12,10);ctx.fillStyle="#d7433e";ctx.fillRect(x-2,y-4,4,7);ctx.fillRect(x-4,y-2,8,3);ctx.fillStyle="#fff";ctx.fillRect(x-2,y-8,4,2);}}
-    function drawCharacter(x,y,isZombie=false){
-      ctx.fillStyle=isZombie?"#263329":"#273329";ctx.fillRect(Math.round(x-6),Math.round(y+5),13,4);
-      ctx.fillStyle=isZombie?"#3a3430":"#342d38";ctx.fillRect(x-5,y+2,4,6);ctx.fillRect(x+2,y+2,4,6);
-      ctx.fillStyle=isZombie?"#59604a":"#315d91";ctx.fillRect(x-7,y-5,14,11);ctx.fillStyle=isZombie?"#70764d":"#497db2";ctx.fillRect(x-5,y-7,10,10);
-      ctx.fillStyle=isZombie?"#79a64d":"#d9a77b";ctx.fillRect(x-4,y-13,9,8);ctx.fillStyle=isZombie?"#405a38":"#62443d";ctx.fillRect(x-4,y-14,9,3);
-      if(isZombie){ctx.fillStyle="#d7e78a";ctx.fillRect(x-2,y-10,2,2);ctx.fillRect(x+2,y-10,2,2);}}
-    function drawZombies(camera){for(const z of zombies){if(z.hp<=0)continue;const x=z.x-camera.x,y=z.y-camera.y;if(x< -24||x>W+24||y< -24||y>H+24)continue;drawCharacter(x,y,true);}}
+    function drawMedkits(camera){for(const m of medkits){const x=Math.round(m.x-camera.x),y=Math.round(m.y-camera.y);if(x< -12||x>W+12||y< -12||y>H+12)continue;ctx.fillStyle="#263329";ctx.fillRect(x-7,y-5,15,12);ctx.fillStyle="#f2f1df";ctx.fillRect(x-6,y-6,12,10);ctx.fillStyle="#d7433e";ctx.fillRect(x-2,y-4,4,7);ctx.fillRect(x-4,y-2,8,3);ctx.fillStyle="#fff";ctx.fillRect(x-2,y-8,4,2);}}
+    function drawCharacter(x,y,isZombie=false,hitFlash=false){
+      const flash=hitFlash;
+      ctx.fillStyle=isZombie?(flash?"#ff3030":"#263329"):"#273329";ctx.fillRect(Math.round(x-6),Math.round(y+5),13,4);
+      ctx.fillStyle=isZombie?(flash?"#ff4a4a":"#3a3430"):"#342d38";ctx.fillRect(x-5,y+2,4,6);ctx.fillRect(x+2,y+2,4,6);
+      ctx.fillStyle=isZombie?(flash?"#ff5555":"#59604a"):"#315d91";ctx.fillRect(x-7,y-5,14,11);ctx.fillStyle=isZombie?(flash?"#ff7777":"#70764d"):"#497db2";ctx.fillRect(x-5,y-7,10,10);
+      ctx.fillStyle=isZombie?(flash?"#ff4a4a":"#79a64d"):"#d9a77b";ctx.fillRect(x-4,y-13,9,8);ctx.fillStyle=isZombie?(flash?"#c91f1f":"#405a38"):"#62443d";ctx.fillRect(x-4,y-14,9,3);
+      if(isZombie){ctx.fillStyle=flash?"#fff":"#d7e78a";ctx.fillRect(x-2,y-10,2,2);ctx.fillRect(x+2,y-10,2,2);}}
+    function drawZombies(camera){for(const z of zombies){if(z.hp<=0)continue;const x=z.x-camera.x,y=z.y-camera.y;if(x< -24||x>W+24||y< -24||y>H+24)continue;drawCharacter(x,y,true,z.hitFlash>0);}}
     function drawBullets(camera){for(const b of bullets){const x=b.x-camera.x,y=b.y-camera.y;if(x< -4||x>W+4||y< -4||y>H+4)continue;ctx.fillStyle="#ffe68a";ctx.fillRect(Math.round(x)-2,Math.round(y)-1,4,3);}}
-    function drawPlayer(camera){const x=player.x-camera.x,y=player.y-camera.y;if(player.invulnerable>0&&Math.floor(player.invulnerable*12)%2===0)return;drawCharacter(x,y);
-      ctx.save();ctx.translate(x,y-1);ctx.rotate(Math.atan2(aim.y,aim.x));ctx.fillStyle="#252a30";ctx.fillRect(3,-2,12,4);ctx.fillStyle="#adb6aa";ctx.fillRect(8,-3,9,2);ctx.fillStyle="#7e8d83";ctx.fillRect(5,2,3,4);ctx.restore();}
+    function drawPlayer(camera){const x=player.x-camera.x,y=player.y-camera.y;if(player.invulnerable>0&&Math.floor(player.invulnerable*12)%2===0)return;drawCharacter(x,y);ctx.save();ctx.translate(x,y-1);ctx.rotate(Math.atan2(aim.y,aim.x));ctx.fillStyle="#252a30";ctx.fillRect(3,-2,12,4);ctx.fillStyle="#adb6aa";ctx.fillRect(8,-3,9,2);ctx.fillStyle="#7e8d83";ctx.fillRect(5,2,3,4);ctx.restore();}
     function draw(){const camera=getCamera();drawRoom(camera);drawMedkits(camera);drawZombies(camera);drawBullets(camera);drawPlayer(camera);}
     function frame(time){const dt=Math.min((time-lastTime)/1000||0,.05);lastTime=time;update(dt);draw();requestAnimationFrame(frame);}
     requestAnimationFrame(frame);
