@@ -49,7 +49,7 @@
     const MEDKIT_SPAWN_INTERVAL = 7.5, MEDKIT_HEAL = 50;
     const ZOMBIE_DAMAGE = 25, BULLET_DAMAGE = 20, ZOMBIE_KNOCKBACK = TILE_SIZE * 2;
     const BULLET_RANGE_MULTIPLIER = 5, BULLET_LIFETIME = 0.65 * BULLET_RANGE_MULTIPLIER;
-    const ZOMBIE_HIT_FLASH_TIME = 0.2;
+    const ZOMBIE_HIT_FLASH_TIME = 0.2, FIRE_INTERVAL_MS = 100;
     let W = 320, H = 180, WORLD_WIDTH = 2400, WORLD_HEIGHT = 1800;
     let gameStarted = false, zombieSpawnTimer = 0, medkitSpawnTimer = 0;
     const player = { x: 1200, y: 900, speed: 78, hp: PLAYER_MAX_HP, invulnerable: 0 };
@@ -114,14 +114,14 @@
       gameStarted=false; resetGame(); deathScreen.classList.add("hidden"); hud.classList.add("hidden"); menu.classList.remove("hidden");
     });
     function pointerAim(event) {
-      const rect=canvas.getBoundingClientRect();
-      const camera=getCamera();
+      const rect=canvas.getBoundingClientRect(), camera=getCamera();
       const worldX=camera.x+(event.clientX-rect.left)*W/rect.width;
       const worldY=camera.y+(event.clientY-rect.top)*H/rect.height;
       const dx=worldX-player.x, dy=worldY-player.y, length=Math.hypot(dx,dy);
-      if(length>0){mouseAim.x=dx/length;mouseAim.y=dy/length;if(!hasArrowAim()) {aim.x=mouseAim.x;aim.y=mouseAim.y;}}
+      if(length>0){mouseAim.x=dx/length;mouseAim.y=dy/length;if(!hasArrowAim()){aim.x=mouseAim.x;aim.y=mouseAim.y;}}
     }
     canvas.addEventListener("pointermove",pointerAim);
+    canvas.addEventListener("pointerdown",event=>{pointerAim(event);if(event.button===0)shoot();});
     function hasArrowAim(){return keys.has("arrowleft")||keys.has("arrowright")||keys.has("arrowup")||keys.has("arrowdown");}
     function updateAimFromKeys() {
       let x=0,y=0;
@@ -140,7 +140,7 @@
     addEventListener("keyup",event=>{keys.delete(event.key.toLowerCase());updateAimFromKeys();});
     addEventListener("blur",()=>keys.clear());
     function shoot() {
-      const now=performance.now(); if(now-lastShot<180) return; lastShot=now;
+      const now=performance.now(); if(now-lastShot<FIRE_INTERVAL_MS) return; lastShot=now;
       bullets.push({x:player.x+aim.x*11,y:player.y+aim.y*11,vx:aim.x*190,vy:aim.y*190,life:BULLET_LIFETIME});
     }
     function damagePlayer(zombie) {
@@ -189,15 +189,34 @@
     }
     function drawMedkits(camera){for(const m of medkits){const x=Math.round(m.x-camera.x),y=Math.round(m.y-camera.y);if(x< -12||x>W+12||y< -12||y>H+12)continue;ctx.fillStyle="#263329";ctx.fillRect(x-7,y-5,15,12);ctx.fillStyle="#f2f1df";ctx.fillRect(x-6,y-6,12,10);ctx.fillStyle="#d7433e";ctx.fillRect(x-2,y-4,4,7);ctx.fillRect(x-4,y-2,8,3);ctx.fillStyle="#fff";ctx.fillRect(x-2,y-8,4,2);}}
     function drawCharacter(x,y,isZombie=false,hitFlash=false){
-      const flash=hitFlash;
-      ctx.fillStyle=isZombie?(flash?"#ff3030":"#263329"):"#273329";ctx.fillRect(Math.round(x-6),Math.round(y+5),13,4);
-      ctx.fillStyle=isZombie?(flash?"#ff4a4a":"#3a3430"):"#342d38";ctx.fillRect(x-5,y+2,4,6);ctx.fillRect(x+2,y+2,4,6);
-      ctx.fillStyle=isZombie?(flash?"#ff5555":"#59604a"):"#315d91";ctx.fillRect(x-7,y-5,14,11);ctx.fillStyle=isZombie?(flash?"#ff7777":"#70764d"):"#497db2";ctx.fillRect(x-5,y-7,10,10);
-      ctx.fillStyle=isZombie?(flash?"#ff4a4a":"#79a64d"):"#d9a77b";ctx.fillRect(x-4,y-13,9,8);ctx.fillStyle=isZombie?(flash?"#c91f1f":"#405a38"):"#62443d";ctx.fillRect(x-4,y-14,9,3);
-      if(isZombie){ctx.fillStyle=flash?"#fff":"#d7e78a";ctx.fillRect(x-2,y-10,2,2);ctx.fillRect(x+2,y-10,2,2);}}
+      ctx.fillStyle=isZombie?(hitFlash?"#ff3030":"#263329"):"#273329";ctx.fillRect(Math.round(x-6),Math.round(y+5),13,4);
+      ctx.fillStyle=isZombie?(hitFlash?"#ff4a4a":"#3a3430"):"#342d38";ctx.fillRect(x-5,y+2,4,6);ctx.fillRect(x+2,y+2,4,6);
+      ctx.fillStyle=isZombie?(hitFlash?"#ff5555":"#59604a"):"#315d91";ctx.fillRect(x-7,y-5,14,11);ctx.fillStyle=isZombie?(hitFlash?"#ff7777":"#70764d"):"#497db2";ctx.fillRect(x-5,y-7,10,10);
+      ctx.fillStyle=isZombie?(hitFlash?"#ff4a4a":"#79a64d"):"#d9a77b";ctx.fillRect(x-4,y-13,9,8);ctx.fillStyle=isZombie?(hitFlash?"#c91f1f":"#405a38"):"#62443d";ctx.fillRect(x-4,y-14,9,3);
+      if(isZombie){ctx.fillStyle=hitFlash?"#fff":"#d7e78a";ctx.fillRect(x-2,y-10,2,2);ctx.fillRect(x+2,y-10,2,2);}}
     function drawZombies(camera){for(const z of zombies){if(z.hp<=0)continue;const x=z.x-camera.x,y=z.y-camera.y;if(x< -24||x>W+24||y< -24||y>H+24)continue;drawCharacter(x,y,true,z.hitFlash>0);}}
     function drawBullets(camera){for(const b of bullets){const x=b.x-camera.x,y=b.y-camera.y;if(x< -4||x>W+4||y< -4||y>H+4)continue;ctx.fillStyle="#ffe68a";ctx.fillRect(Math.round(x)-2,Math.round(y)-1,4,3);}}
-    function drawPlayer(camera){const x=player.x-camera.x,y=player.y-camera.y;if(player.invulnerable>0&&Math.floor(player.invulnerable*12)%2===0)return;drawCharacter(x,y);ctx.save();ctx.translate(x,y-1);ctx.rotate(Math.atan2(aim.y,aim.x));ctx.fillStyle="#252a30";ctx.fillRect(3,-2,12,4);ctx.fillStyle="#adb6aa";ctx.fillRect(8,-3,9,2);ctx.fillStyle="#7e8d83";ctx.fillRect(5,2,3,4);ctx.restore();}
+    function drawPlayer(camera){
+      const x=player.x-camera.x,y=player.y-camera.y;
+      if(player.invulnerable>0&&Math.floor(player.invulnerable*12)%2===0)return;
+      drawCharacter(x,y);
+      // Compact, stylized pixel-art pistol inspired by a Glock 19 silhouette.
+      ctx.save();ctx.translate(x,y-1);ctx.rotate(Math.atan2(aim.y,aim.x));
+      // Textured grip and grip panels.
+      ctx.fillStyle="#20262b";ctx.fillRect(1,2,6,9);
+      ctx.fillStyle="#41484b";ctx.fillRect(2,4,4,1);ctx.fillRect(2,7,4,1);
+      // Frame and trigger guard.
+      ctx.fillStyle="#30373b";ctx.fillRect(3,0,13,4);ctx.fillRect(6,3,5,3);
+      ctx.fillStyle="#151a1d";ctx.fillRect(7,3,3,2);
+      // Squared slide, rear sight and muzzle.
+      ctx.fillStyle="#596267";ctx.fillRect(5,-4,14,4);
+      ctx.fillStyle="#858e90";ctx.fillRect(7,-3,9,1);
+      ctx.fillStyle="#252b2f";ctx.fillRect(4,-5,2,1);ctx.fillRect(17,-5,2,1);
+      ctx.fillStyle="#171c1f";ctx.fillRect(18,-3,3,2);
+      // Small slide serrations.
+      ctx.fillStyle="#30373b";ctx.fillRect(7,-2,1,2);ctx.fillRect(9,-2,1,2);
+      ctx.restore();
+    }
     function draw(){const camera=getCamera();drawRoom(camera);drawMedkits(camera);drawZombies(camera);drawBullets(camera);drawPlayer(camera);}
     function frame(time){const dt=Math.min((time-lastTime)/1000||0,.05);lastTime=time;update(dt);draw();requestAnimationFrame(frame);}
     requestAnimationFrame(frame);
