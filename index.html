@@ -3,132 +3,166 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Pixel Explorer</title>
+  <title>Pixel Survivor</title>
   <style>
     * { box-sizing: border-box; }
-
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
     body {
-      margin: 0;
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      padding: 20px;
       color: #e8f0dd;
       background: #101914;
       font-family: system-ui, sans-serif;
     }
-
-    main { width: min(960px, 100%); }
-
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: end;
-      gap: 16px;
-      margin-bottom: 12px;
-    }
-
-    h1 {
-      margin: 0;
-      color: #c8ef91;
-      font-size: clamp(1.3rem, 4vw, 2rem);
-      letter-spacing: 0.04em;
-    }
-
-    header p {
-      margin: 0;
-      color: #a7b6a2;
-      font-size: 0.9rem;
-      text-align: right;
-    }
-
-    .frame {
-      padding: 8px;
-      background: #26372a;
-      border: 3px solid #536a4c;
-      box-shadow: 0 12px 40px #0008;
-    }
-
     canvas {
       display: block;
-      width: 100%;
-      height: auto;
-      aspect-ratio: 16 / 9;
-      background: #526b43;
+      width: 100vw;
+      height: 100vh;
       image-rendering: pixelated;
-      cursor: crosshair;
     }
-
-    .help {
-      margin-top: 12px;
-      color: #a7b6a2;
-      font-size: 0.9rem;
-      line-height: 1.5;
+    .menu {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: linear-gradient(135deg, rgba(10, 20, 15, .88), rgba(15, 25, 20, .72));
     }
-
-    .help strong { color: #e8f0dd; }
-
-    @media (max-width: 560px) {
-      header { align-items: start; flex-direction: column; }
-      header p { text-align: left; }
+    .menu-card {
+      width: min(440px, 100%);
+      padding: 36px;
+      text-align: center;
+      background: rgba(25, 39, 29, .96);
+      border: 3px solid #71845a;
+      box-shadow: 0 16px 60px #0009;
+    }
+    h1 {
+      margin: 0 0 8px;
+      color: #c8ef91;
+      font-size: clamp(2.4rem, 8vw, 4.5rem);
+      line-height: 1;
+      letter-spacing: .04em;
+      text-shadow: 4px 4px 0 #344b31;
+    }
+    .tagline { margin: 0 0 28px; color: #b5c3a9; }
+    .menu-buttons { display: grid; gap: 12px; }
+    .menu button {
+      width: 100%;
+      padding: 13px 18px;
+      color: #142012;
+      background: #c8ef91;
+      border: 2px solid #e1f6b9;
+      font: inherit;
+      font-size: 1.05rem;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .menu button:hover:not(:disabled) { background: #e1f6b9; }
+    .menu button:disabled {
+      color: #a4ad9c;
+      background: #394438;
+      border-color: #566450;
+      cursor: not-allowed;
+    }
+    .coming-soon { margin-left: 6px; font-size: .75rem; font-weight: 500; }
+    .controls {
+      position: fixed;
+      right: 24px;
+      bottom: 20px;
+      padding: 12px 16px;
+      color: #dce8d1;
+      background: rgba(14, 25, 17, .9);
+      border: 1px solid #71845a;
+      font-size: .9rem;
+      line-height: 1.65;
+    }
+    .controls strong { color: #c8ef91; }
+    .hidden { display: none; }
+    @media (max-width: 600px) {
+      .menu-card { padding: 28px 20px; }
+      .controls { right: 12px; bottom: 12px; font-size: .78rem; }
     }
   </style>
 </head>
 <body>
-  <main>
-    <header>
-      <h1>PIXEL EXPLORER</h1>
-      <p>Explore a larger world that scrolls as you move.</p>
-    </header>
+  <canvas id="game" aria-label="Pixel Survivor game"></canvas>
 
-    <div class="frame">
-      <canvas id="game" width="320" height="180" aria-label="Top-down pixel game"></canvas>
+  <section class="menu" id="menu" aria-label="Main menu">
+    <div class="menu-card">
+      <h1>Pixel<br />Survivor</h1>
+      <p class="tagline">Explore the pixel world. No enemies yet.</p>
+      <div class="menu-buttons">
+        <button id="startButton" type="button">Start Game</button>
+        <button type="button" disabled aria-disabled="true">Weapons <span class="coming-soon">Coming soon</span></button>
+      </div>
     </div>
-
-    <p class="help">
-      <strong>Move:</strong> WASD &nbsp;·&nbsp;
-      <strong>Aim:</strong> Arrow keys (diagonal works; direction stays aimed) &nbsp;·&nbsp;
-      <strong>Fire:</strong> Space
-    </p>
-  </main>
+    <aside class="controls">
+      <strong>CONTROLS</strong><br />
+      Move: <strong>W A S D</strong><br />
+      Aim: <strong>Arrow keys</strong> (diagonal too)<br />
+      Shoot: <strong>Space</strong>
+    </aside>
+  </section>
 
   <script>
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
     ctx.imageSmoothingEnabled = false;
 
-    const W = canvas.width;
-    const H = canvas.height;
-    const WORLD_WIDTH = 1600;
-    const WORLD_HEIGHT = 1200;
     const TILE_SIZE = 16;
+    let W = 320;
+    let H = 180;
+    let WORLD_WIDTH = 2400;
+    let WORLD_HEIGHT = 1800;
+    let pixelScale = 1;
+    let gameStarted = false;
 
-    const player = { x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2, speed: 78 };
+    const player = { x: 1200, y: 900, speed: 78 };
     const keys = new Set();
     const bullets = [];
     const aim = { x: 1, y: 0 };
     let lastTime = 0;
     let lastShot = 0;
 
-    // Decorations are placed in world coordinates, so they scroll with the map.
     const plants = [
       { x: 45, y: 42 }, { x: 263, y: 36 }, { x: 69, y: 146 }, { x: 278, y: 132 },
       { x: 390, y: 270 }, { x: 610, y: 190 }, { x: 820, y: 350 }, { x: 1250, y: 230 },
       { x: 1450, y: 510 }, { x: 300, y: 700 }, { x: 560, y: 940 }, { x: 980, y: 820 },
-      { x: 1380, y: 1050 }, { x: 1120, y: 1090 }, { x: 170, y: 1060 }, { x: 760, y: 650 }
+      { x: 1380, y: 1050 }, { x: 1120, y: 1090 }, { x: 170, y: 1060 }, { x: 760, y: 650 },
+      { x: 1900, y: 300 }, { x: 2150, y: 620 }, { x: 1800, y: 1250 }, { x: 2050, y: 1550 },
+      { x: 450, y: 1500 }, { x: 800, y: 1330 }, { x: 1600, y: 1550 }, { x: 2250, y: 1050 },
+      { x: 1050, y: 450 }, { x: 1550, y: 780 }, { x: 350, y: 1150 }, { x: 1850, y: 950 }
     ];
+
+    function resizeCanvas() {
+      // Render at a low internal resolution and enlarge with pixelated scaling.
+      pixelScale = Math.max(1, Math.floor(Math.min(innerWidth / 320, innerHeight / 180)));
+      W = Math.ceil(innerWidth / pixelScale);
+      H = Math.ceil(innerHeight / pixelScale);
+      canvas.width = W;
+      canvas.height = H;
+      WORLD_WIDTH = Math.max(2400, W + 320);
+      WORLD_HEIGHT = Math.max(1800, H + 240);
+      player.x = Math.min(WORLD_WIDTH - 14, Math.max(14, player.x));
+      player.y = Math.min(WORLD_HEIGHT - 14, Math.max(14, player.y));
+      ctx.imageSmoothingEnabled = false;
+    }
+
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+
+    document.getElementById("startButton").addEventListener("click", () => {
+      gameStarted = true;
+      document.getElementById("menu").classList.add("hidden");
+      canvas.focus();
+    });
 
     function updateAimFromKeys() {
       let aimX = 0;
       let aimY = 0;
-
       if (keys.has("arrowleft")) aimX -= 1;
       if (keys.has("arrowright")) aimX += 1;
       if (keys.has("arrowup")) aimY -= 1;
       if (keys.has("arrowdown")) aimY += 1;
-
-      // Keep the last aim direction when no arrow key is held.
-      if (aimX !== 0 || aimY !== 0) {
+      if (aimX || aimY) {
         const length = Math.hypot(aimX, aimY);
         aim.x = aimX / length;
         aim.y = aimY / length;
@@ -137,31 +171,27 @@
 
     window.addEventListener("keydown", event => {
       const key = event.key.toLowerCase();
-
-      if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) {
+      if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(key)) {
         event.preventDefault();
+      }
+      if (!gameStarted) return;
+      if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) {
         keys.add(key);
         updateAimFromKeys();
       }
-
-      if (key === " " || event.code === "Space") {
-        event.preventDefault();
-        if (!event.repeat) shoot();
-      }
+      if ((key === " " || event.code === "Space") && !event.repeat) shoot();
     });
 
     window.addEventListener("keyup", event => {
       keys.delete(event.key.toLowerCase());
       updateAimFromKeys();
     });
-
     window.addEventListener("blur", () => keys.clear());
 
     function shoot() {
       const now = performance.now();
       if (now - lastShot < 180) return;
       lastShot = now;
-
       bullets.push({
         x: player.x + aim.x * 11,
         y: player.y + aim.y * 11,
@@ -172,33 +202,27 @@
     }
 
     function update(dt) {
-      let dx = 0;
-      let dy = 0;
-
-      if (keys.has("a")) dx -= 1;
-      if (keys.has("d")) dx += 1;
-      if (keys.has("w")) dy -= 1;
-      if (keys.has("s")) dy += 1;
-
-      if (dx && dy) {
-        dx *= Math.SQRT1_2;
-        dy *= Math.SQRT1_2;
+      if (gameStarted) {
+        let dx = 0;
+        let dy = 0;
+        if (keys.has("a")) dx -= 1;
+        if (keys.has("d")) dx += 1;
+        if (keys.has("w")) dy -= 1;
+        if (keys.has("s")) dy += 1;
+        if (dx && dy) {
+          dx *= Math.SQRT1_2;
+          dy *= Math.SQRT1_2;
+        }
+        player.x = Math.max(14, Math.min(WORLD_WIDTH - 14, player.x + dx * player.speed * dt));
+        player.y = Math.max(14, Math.min(WORLD_HEIGHT - 14, player.y + dy * player.speed * dt));
       }
-
-      player.x = Math.max(14, Math.min(WORLD_WIDTH - 14, player.x + dx * player.speed * dt));
-      player.y = Math.max(14, Math.min(WORLD_HEIGHT - 14, player.y + dy * player.speed * dt));
 
       for (let i = bullets.length - 1; i >= 0; i--) {
         const bullet = bullets[i];
         bullet.x += bullet.vx * dt;
         bullet.y += bullet.vy * dt;
         bullet.life -= dt;
-
-        if (
-          bullet.life <= 0 ||
-          bullet.x < 0 || bullet.x > WORLD_WIDTH ||
-          bullet.y < 0 || bullet.y > WORLD_HEIGHT
-        ) {
+        if (bullet.life <= 0 || bullet.x < 0 || bullet.x > WORLD_WIDTH || bullet.y < 0 || bullet.y > WORLD_HEIGHT) {
           bullets.splice(i, 1);
         }
       }
@@ -214,8 +238,6 @@
     function drawRoom(camera) {
       ctx.fillStyle = "#526b43";
       ctx.fillRect(0, 0, W, H);
-
-      // Draw a world-aligned tiled floor so the ground visibly scrolls.
       const startX = Math.floor(camera.x / TILE_SIZE) * TILE_SIZE;
       const startY = Math.floor(camera.y / TILE_SIZE) * TILE_SIZE;
       for (let worldY = startY; worldY < camera.y + H + TILE_SIZE; worldY += TILE_SIZE) {
@@ -227,61 +249,47 @@
         }
       }
 
-      // The map has edges; draw its stone border only when it enters view.
       ctx.fillStyle = "#26372a";
       if (camera.y === 0) ctx.fillRect(0, 0, W, 8);
       if (camera.y + H >= WORLD_HEIGHT) ctx.fillRect(0, H - 8, W, 8);
       if (camera.x === 0) ctx.fillRect(0, 0, 8, H);
       if (camera.x + W >= WORLD_WIDTH) ctx.fillRect(W - 8, 0, 8, H);
 
-      ctx.fillStyle = "#71845a";
-      if (camera.y === 0 || camera.y + H >= WORLD_HEIGHT) {
-        const borderY = camera.y === 0 ? 2 : H - 5;
-        for (let x = 12; x < W - 12; x += 16) ctx.fillRect(x, borderY, 8, 2);
-      }
-
       for (const plant of plants) {
-        const screenX = plant.x - camera.x;
-        const screenY = plant.y - camera.y;
-        if (screenX < -12 || screenX > W + 12 || screenY < -12 || screenY > H + 12) continue;
-
+        const x = plant.x - camera.x;
+        const y = plant.y - camera.y;
+        if (x < -12 || x > W + 12 || y < -12 || y > H + 12) continue;
         ctx.fillStyle = "#304733";
-        ctx.fillRect(screenX - 4, screenY + 3, 10, 5);
+        ctx.fillRect(x - 4, y + 3, 10, 5);
         ctx.fillStyle = "#83a95b";
-        ctx.fillRect(screenX, screenY - 3, 4, 8);
-        ctx.fillRect(screenX - 4, screenY, 4, 4);
-        ctx.fillRect(screenX + 4, screenY - 1, 4, 4);
+        ctx.fillRect(x, y - 3, 4, 8);
+        ctx.fillRect(x - 4, y, 4, 4);
+        ctx.fillRect(x + 4, y - 1, 4, 4);
         ctx.fillStyle = "#b1c96b";
-        ctx.fillRect(screenX, screenY - 5, 3, 3);
+        ctx.fillRect(x, y - 5, 3, 3);
       }
     }
 
     function drawPlayer(camera) {
-      // Camera follows the player; the player stays centered except near world edges.
-      const screenX = player.x - camera.x;
-      const screenY = player.y - camera.y;
-      const angle = Math.atan2(aim.y, aim.x);
-
+      const x = player.x - camera.x;
+      const y = player.y - camera.y;
       ctx.fillStyle = "#273329";
-      ctx.fillRect(Math.round(screenX - 6), Math.round(screenY + 5), 13, 4);
-
+      ctx.fillRect(Math.round(x - 6), Math.round(y + 5), 13, 4);
       ctx.fillStyle = "#342d38";
-      ctx.fillRect(screenX - 5, screenY + 2, 4, 6);
-      ctx.fillRect(screenX + 2, screenY + 2, 4, 6);
-
+      ctx.fillRect(x - 5, y + 2, 4, 6);
+      ctx.fillRect(x + 2, y + 2, 4, 6);
       ctx.fillStyle = "#315d91";
-      ctx.fillRect(screenX - 7, screenY - 5, 14, 11);
+      ctx.fillRect(x - 7, y - 5, 14, 11);
       ctx.fillStyle = "#497db2";
-      ctx.fillRect(screenX - 5, screenY - 7, 10, 10);
-
+      ctx.fillRect(x - 5, y - 7, 10, 10);
       ctx.fillStyle = "#d9a77b";
-      ctx.fillRect(screenX - 4, screenY - 13, 9, 8);
+      ctx.fillRect(x - 4, y - 13, 9, 8);
       ctx.fillStyle = "#62443d";
-      ctx.fillRect(screenX - 4, screenY - 14, 9, 3);
+      ctx.fillRect(x - 4, y - 14, 9, 3);
 
       ctx.save();
-      ctx.translate(screenX, screenY - 1);
-      ctx.rotate(angle);
+      ctx.translate(x, y - 1);
+      ctx.rotate(Math.atan2(aim.y, aim.x));
       ctx.fillStyle = "#252a30";
       ctx.fillRect(3, -2, 12, 4);
       ctx.fillStyle = "#adb6aa";
@@ -293,11 +301,11 @@
 
     function drawBullets(camera) {
       for (const bullet of bullets) {
-        const screenX = bullet.x - camera.x;
-        const screenY = bullet.y - camera.y;
-        if (screenX < -4 || screenX > W + 4 || screenY < -4 || screenY > H + 4) continue;
+        const x = bullet.x - camera.x;
+        const y = bullet.y - camera.y;
+        if (x < -4 || x > W + 4 || y < -4 || y > H + 4) continue;
         ctx.fillStyle = "#ffe68a";
-        ctx.fillRect(Math.round(screenX) - 2, Math.round(screenY) - 1, 4, 3);
+        ctx.fillRect(Math.round(x) - 2, Math.round(y) - 1, 4, 3);
       }
     }
 
@@ -306,10 +314,6 @@
       drawRoom(camera);
       drawBullets(camera);
       drawPlayer(camera);
-
-      ctx.fillStyle = "#e8f0dd";
-      ctx.font = "7px monospace";
-      ctx.fillText("NO ENEMIES • EXPLORE", 13, 17);
     }
 
     function frame(time) {
