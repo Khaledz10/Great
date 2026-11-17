@@ -9,9 +9,10 @@
     html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
     body { color: #e8f0dd; background: #101914; font-family: system-ui, sans-serif; }
     canvas { display: block; width: 100vw; height: 100vh; image-rendering: pixelated; }
+    .menu, .death-screen {
+      position: fixed; inset: 0; display: grid; place-items: center; padding: 24px;
+    }
     .menu {
-      position: fixed; inset: 0; display: grid; place-items: center;
-      padding: 24px;
       background: linear-gradient(135deg, rgba(10, 20, 15, .88), rgba(15, 25, 20, .72));
     }
     .menu-card {
@@ -50,6 +51,19 @@
     }
     .health-track { height: 12px; margin-top: 6px; background: #352d2b; border: 1px solid #8a9b79; }
     .health-fill { width: 100%; height: 100%; background: #77c957; transition: width .12s linear; }
+    .death-screen {
+      z-index: 5; background: rgba(255, 0, 0, .75); text-align: center;
+    }
+    .death-card { display: grid; justify-items: center; gap: 22px; }
+    .death-title {
+      margin: 0; color: #fff; font: 900 clamp(3rem, 10vw, 6rem)/1 monospace;
+      text-shadow: 4px 4px 0 #7a0000;
+    }
+    .back-button {
+      padding: 12px 22px; color: #000; background: #8b1010;
+      border: 2px solid #fff; font: 800 1rem system-ui, sans-serif; cursor: pointer;
+    }
+    .back-button:hover { background: #a51b1b; }
     .hidden { display: none; }
     @media (max-width: 600px) {
       .menu-card { padding: 28px 20px; }
@@ -83,6 +97,13 @@
     </aside>
   </section>
 
+  <section class="death-screen hidden" id="deathScreen" aria-label="You died">
+    <div class="death-card">
+      <h2 class="death-title">You Died</h2>
+      <button class="back-button" id="backButton" type="button">Back to Menu</button>
+    </div>
+  </section>
+
   <script>
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
@@ -93,6 +114,7 @@
     const PLAYER_MAX_HP = 100;
     const ZOMBIE_MAX_HP = 100;
     const ZOMBIE_DAMAGE = 25;
+    const BULLET_DAMAGE = 20;
     const ZOMBIE_KNOCKBACK = TILE_SIZE * 2;
     let W = 320;
     let H = 180;
@@ -110,6 +132,9 @@
 
     const healthText = document.getElementById("healthText");
     const healthFill = document.getElementById("healthFill");
+    const menu = document.getElementById("menu");
+    const hud = document.getElementById("hud");
+    const deathScreen = document.getElementById("deathScreen");
 
     const plants = [
       { x: 45, y: 42 }, { x: 263, y: 36 }, { x: 69, y: 146 }, { x: 278, y: 132 },
@@ -143,12 +168,38 @@
     window.addEventListener("resize", resizeCanvas);
     resizeCanvas();
 
-    document.getElementById("startButton").addEventListener("click", () => {
-      gameStarted = true;
-      document.getElementById("menu").classList.add("hidden");
-      document.getElementById("hud").classList.remove("hidden");
+    function resetGame() {
+      player.x = 1200;
+      player.y = 900;
+      player.hp = PLAYER_MAX_HP;
+      player.invulnerable = 0;
+      zombie.x = 1304;
+      zombie.y = 900;
+      zombie.hp = ZOMBIE_MAX_HP;
+      zombie.chasing = false;
+      zombie.attackCooldown = 0;
+      bullets.length = 0;
+      keys.clear();
+      aim.x = 1;
+      aim.y = 0;
+      lastShot = 0;
       updateHealthDisplay();
-      canvas.focus();
+    }
+
+    document.getElementById("startButton").addEventListener("click", () => {
+      resetGame();
+      gameStarted = true;
+      menu.classList.add("hidden");
+      deathScreen.classList.add("hidden");
+      hud.classList.remove("hidden");
+    });
+
+    document.getElementById("backButton").addEventListener("click", () => {
+      gameStarted = false;
+      resetGame();
+      deathScreen.classList.add("hidden");
+      hud.classList.add("hidden");
+      menu.classList.remove("hidden");
     });
 
     function updateAimFromKeys() {
@@ -200,7 +251,6 @@
       player.hp = Math.max(0, player.hp - ZOMBIE_DAMAGE);
       player.invulnerable = 0.8;
 
-      // Push the player two tiles directly away from the zombie.
       let awayX = player.x - zombie.x;
       let awayY = player.y - zombie.y;
       let distance = Math.hypot(awayX, awayY);
@@ -212,6 +262,12 @@
       player.x = Math.max(14, Math.min(WORLD_WIDTH - 14, player.x + (awayX / distance) * ZOMBIE_KNOCKBACK));
       player.y = Math.max(14, Math.min(WORLD_HEIGHT - 14, player.y + (awayY / distance) * ZOMBIE_KNOCKBACK));
       updateHealthDisplay();
+
+      if (player.hp <= 0) {
+        keys.clear();
+        gameStarted = false;
+        deathScreen.classList.remove("hidden");
+      }
     }
 
     function update(dt) {
@@ -255,7 +311,7 @@
         bullet.life -= dt;
 
         if (zombie.hp > 0 && Math.hypot(bullet.x - zombie.x, bullet.y - zombie.y) < 11) {
-          zombie.hp = Math.max(0, zombie.hp - 25);
+          zombie.hp = Math.max(0, zombie.hp - BULLET_DAMAGE);
           bullets.splice(i, 1);
           continue;
         }
@@ -369,15 +425,6 @@
       drawZombie(camera);
       drawBullets(camera);
       drawPlayer(camera);
-      if (gameStarted && player.hp <= 0) {
-        ctx.fillStyle = "rgba(10, 15, 12, .72)";
-        ctx.fillRect(0, 0, W, H);
-        ctx.fillStyle = "#f1f5e9";
-        ctx.textAlign = "center";
-        ctx.font = "bold 18px monospace";
-        ctx.fillText("YOU WERE CAUGHT", W / 2, H / 2);
-        ctx.textAlign = "start";
-      }
     }
 
     function frame(time) {
