@@ -78,7 +78,7 @@
   <main>
     <header>
       <h1>PIXEL EXPLORER</h1>
-      <p>Just you, an empty room, and plenty of space to explore.</p>
+      <p>Explore a larger world that scrolls as you move.</p>
     </header>
 
     <div class="frame">
@@ -99,17 +99,23 @@
 
     const W = canvas.width;
     const H = canvas.height;
+    const WORLD_WIDTH = 1600;
+    const WORLD_HEIGHT = 1200;
+    const TILE_SIZE = 16;
 
-    const player = { x: W / 2, y: H / 2, speed: 78 };
+    const player = { x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2, speed: 78 };
     const keys = new Set();
     const bullets = [];
     const aim = { x: 1, y: 0 };
     let lastTime = 0;
     let lastShot = 0;
 
+    // Decorations are placed in world coordinates, so they scroll with the map.
     const plants = [
-      { x: 45, y: 42 }, { x: 263, y: 36 },
-      { x: 69, y: 146 }, { x: 278, y: 132 }
+      { x: 45, y: 42 }, { x: 263, y: 36 }, { x: 69, y: 146 }, { x: 278, y: 132 },
+      { x: 390, y: 270 }, { x: 610, y: 190 }, { x: 820, y: 350 }, { x: 1250, y: 230 },
+      { x: 1450, y: 510 }, { x: 300, y: 700 }, { x: 560, y: 940 }, { x: 980, y: 820 },
+      { x: 1380, y: 1050 }, { x: 1120, y: 1090 }, { x: 170, y: 1060 }, { x: 760, y: 650 }
     ];
 
     function updateAimFromKeys() {
@@ -179,8 +185,8 @@
         dy *= Math.SQRT1_2;
       }
 
-      player.x = Math.max(14, Math.min(W - 14, player.x + dx * player.speed * dt));
-      player.y = Math.max(14, Math.min(H - 14, player.y + dy * player.speed * dt));
+      player.x = Math.max(14, Math.min(WORLD_WIDTH - 14, player.x + dx * player.speed * dt));
+      player.y = Math.max(14, Math.min(WORLD_HEIGHT - 14, player.y + dy * player.speed * dt));
 
       for (let i = bullets.length - 1; i >= 0; i--) {
         const bullet = bullets[i];
@@ -190,73 +196,91 @@
 
         if (
           bullet.life <= 0 ||
-          bullet.x < 0 || bullet.x > W ||
-          bullet.y < 0 || bullet.y > H
+          bullet.x < 0 || bullet.x > WORLD_WIDTH ||
+          bullet.y < 0 || bullet.y > WORLD_HEIGHT
         ) {
           bullets.splice(i, 1);
         }
       }
     }
 
-    function drawRoom() {
+    function getCamera() {
+      return {
+        x: Math.max(0, Math.min(WORLD_WIDTH - W, player.x - W / 2)),
+        y: Math.max(0, Math.min(WORLD_HEIGHT - H, player.y - H / 2))
+      };
+    }
+
+    function drawRoom(camera) {
       ctx.fillStyle = "#526b43";
       ctx.fillRect(0, 0, W, H);
 
-      for (let y = 8; y < H; y += 16) {
-        for (let x = 8; x < W; x += 16) {
-          if ((x / 16 + y / 16) % 2 === 0) {
+      // Draw a world-aligned tiled floor so the ground visibly scrolls.
+      const startX = Math.floor(camera.x / TILE_SIZE) * TILE_SIZE;
+      const startY = Math.floor(camera.y / TILE_SIZE) * TILE_SIZE;
+      for (let worldY = startY; worldY < camera.y + H + TILE_SIZE; worldY += TILE_SIZE) {
+        for (let worldX = startX; worldX < camera.x + W + TILE_SIZE; worldX += TILE_SIZE) {
+          if (((worldX / TILE_SIZE) + (worldY / TILE_SIZE)) % 2 === 0) {
             ctx.fillStyle = "#587348";
-            ctx.fillRect(x, y, 16, 16);
+            ctx.fillRect(worldX - camera.x, worldY - camera.y, TILE_SIZE, TILE_SIZE);
           }
         }
       }
 
+      // The map has edges; draw its stone border only when it enters view.
       ctx.fillStyle = "#26372a";
-      ctx.fillRect(0, 0, W, 8);
-      ctx.fillRect(0, H - 8, W, 8);
-      ctx.fillRect(0, 0, 8, H);
-      ctx.fillRect(W - 8, 0, 8, H);
+      if (camera.y === 0) ctx.fillRect(0, 0, W, 8);
+      if (camera.y + H >= WORLD_HEIGHT) ctx.fillRect(0, H - 8, W, 8);
+      if (camera.x === 0) ctx.fillRect(0, 0, 8, H);
+      if (camera.x + W >= WORLD_WIDTH) ctx.fillRect(W - 8, 0, 8, H);
 
       ctx.fillStyle = "#71845a";
-      for (let x = 12; x < W - 12; x += 16) {
-        ctx.fillRect(x, 2, 8, 2);
-        ctx.fillRect(x, H - 5, 8, 2);
+      if (camera.y === 0 || camera.y + H >= WORLD_HEIGHT) {
+        const borderY = camera.y === 0 ? 2 : H - 5;
+        for (let x = 12; x < W - 12; x += 16) ctx.fillRect(x, borderY, 8, 2);
       }
 
       for (const plant of plants) {
+        const screenX = plant.x - camera.x;
+        const screenY = plant.y - camera.y;
+        if (screenX < -12 || screenX > W + 12 || screenY < -12 || screenY > H + 12) continue;
+
         ctx.fillStyle = "#304733";
-        ctx.fillRect(plant.x - 4, plant.y + 3, 10, 5);
+        ctx.fillRect(screenX - 4, screenY + 3, 10, 5);
         ctx.fillStyle = "#83a95b";
-        ctx.fillRect(plant.x, plant.y - 3, 4, 8);
-        ctx.fillRect(plant.x - 4, plant.y, 4, 4);
-        ctx.fillRect(plant.x + 4, plant.y - 1, 4, 4);
+        ctx.fillRect(screenX, screenY - 3, 4, 8);
+        ctx.fillRect(screenX - 4, screenY, 4, 4);
+        ctx.fillRect(screenX + 4, screenY - 1, 4, 4);
         ctx.fillStyle = "#b1c96b";
-        ctx.fillRect(plant.x, plant.y - 5, 3, 3);
+        ctx.fillRect(screenX, screenY - 5, 3, 3);
       }
     }
 
-    function drawPlayer() {
+    function drawPlayer(camera) {
+      // Camera follows the player; the player stays centered except near world edges.
+      const screenX = player.x - camera.x;
+      const screenY = player.y - camera.y;
       const angle = Math.atan2(aim.y, aim.x);
 
       ctx.fillStyle = "#273329";
-      ctx.fillRect(Math.round(player.x - 6), Math.round(player.y + 5), 13, 4);
+      ctx.fillRect(Math.round(screenX - 6), Math.round(screenY + 5), 13, 4);
 
       ctx.fillStyle = "#342d38";
-      ctx.fillRect(player.x - 5, player.y + 2, 4, 6);
-      ctx.fillRect(player.x + 2, player.y + 2, 4, 6);
+      ctx.fillRect(screenX - 5, screenY + 2, 4, 6);
+      ctx.fillRect(screenX + 2, screenY + 2, 4, 6);
 
       ctx.fillStyle = "#315d91";
-      ctx.fillRect(player.x - 7, player.y - 5, 14, 11);
+      ctx.fillRect(screenX - 7, screenY - 5, 14, 11);
       ctx.fillStyle = "#497db2";
-      ctx.fillRect(player.x - 5, player.y - 7, 10, 10);
+      ctx.fillRect(screenX - 5, screenY - 7, 10, 10);
 
       ctx.fillStyle = "#d9a77b";
-      ctx.fillRect(player.x - 4, player.y - 13, 9, 8);
+      ctx.fillRect(screenX - 4, screenY - 13, 9, 8);
       ctx.fillStyle = "#62443d";
-      ctx.fillRect(player.x - 4, player.y - 14, 9, 3);
+      ctx.fillRect(screenX - 4, screenY - 14, 9, 3);
 
       ctx.save();
-      ctx.translate(player.x, player.y - 1);
+      ctx.translate(screenX, screenY - 1);
       ctx.rotate(angle);
       ctx.fillStyle = "#252a30";
       ctx.fillRect(3, -2, 12, 4);
@@ -267,17 +291,21 @@
       ctx.restore();
     }
 
-    function drawBullets() {
+    function drawBullets(camera) {
       for (const bullet of bullets) {
+        const screenX = bullet.x - camera.x;
+        const screenY = bullet.y - camera.y;
+        if (screenX < -4 || screenX > W + 4 || screenY < -4 || screenY > H + 4) continue;
         ctx.fillStyle = "#ffe68a";
-        ctx.fillRect(Math.round(bullet.x) - 2, Math.round(bullet.y) - 1, 4, 3);
+        ctx.fillRect(Math.round(screenX) - 2, Math.round(screenY) - 1, 4, 3);
       }
     }
 
     function draw() {
-      drawRoom();
-      drawBullets();
-      drawPlayer();
+      const camera = getCamera();
+      drawRoom(camera);
+      drawBullets(camera);
+      drawPlayer(camera);
 
       ctx.fillStyle = "#e8f0dd";
       ctx.font = "7px monospace";
