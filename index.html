@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pixel Explorer</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      color: #e8f0dd;
+      background: #101914;
+      font-family: system-ui, sans-serif;
+    }
+
+    main { width: min(960px, 100%); }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      color: #c8ef91;
+      font-size: clamp(1.3rem, 4vw, 2rem);
+      letter-spacing: 0.04em;
+    }
+
+    header p {
+      margin: 0;
+      color: #a7b6a2;
+      font-size: 0.9rem;
+      text-align: right;
+    }
+
+    .frame {
+      padding: 8px;
+      background: #26372a;
+      border: 3px solid #536a4c;
+      box-shadow: 0 12px 40px #0008;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 16 / 9;
+      background: #526b43;
+      image-rendering: pixelated;
+      cursor: crosshair;
+    }
+
+    .help {
+      margin-top: 12px;
+      color: #a7b6a2;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .help strong { color: #e8f0dd; }
+
+    @media (max-width: 560px) {
+      header { align-items: start; flex-direction: column; }
+      header p { text-align: left; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>PIXEL EXPLORER</h1>
+      <p>Just you, an empty room, and plenty of space to explore.</p>
+    </header>
+
+    <div class="frame">
+      <canvas id="game" width="320" height="180" aria-label="Top-down pixel game"></canvas>
+    </div>
+
+    <p class="help">
+      <strong>Move:</strong> WASD or arrow keys &nbsp;·&nbsp;
+      <strong>Aim:</strong> mouse &nbsp;·&nbsp;
+      <strong>Fire:</strong> click
+    </p>
+  </main>
+
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+
+    const W = canvas.width;
+    const H = canvas.height;
+
+    const player = { x: W / 2, y: H / 2, speed: 78 };
+    const keys = new Set();
+    const bullets = [];
+    let mouse = { x: player.x + 30, y: player.y };
+    let lastTime = 0;
+    let lastShot = 0;
+
+    // Fixed little decorations keep the room looking consistent.
+    const plants = [
+      { x: 45, y: 42 }, { x: 263, y: 36 },
+      { x: 69, y: 146 }, { x: 278, y: 132 }
+    ];
+
+    function pointerPosition(event) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: (event.clientX - rect.left) * W / rect.width,
+        y: (event.clientY - rect.top) * H / rect.height
+      };
+    }
+
+    canvas.addEventListener("pointermove", event => {
+      mouse = pointerPosition(event);
+    });
+
+    canvas.addEventListener("pointerdown", event => {
+      if (event.button !== 0) return;
+      mouse = pointerPosition(event);
+      shoot();
+    });
+
+    window.addEventListener("keydown", event => {
+      const key = event.key.toLowerCase();
+      if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) {
+        event.preventDefault();
+        keys.add(key);
+      }
+    });
+
+    window.addEventListener("keyup", event => {
+      keys.delete(event.key.toLowerCase());
+    });
+
+    window.addEventListener("blur", () => keys.clear());
+
+    function shoot() {
+      const now = performance.now();
+      if (now - lastShot < 180) return;
+      lastShot = now;
+
+      const angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
+      const startX = player.x + Math.cos(angle) * 11;
+      const startY = player.y + Math.sin(angle) * 11;
+
+      bullets.push({
+        x: startX,
+        y: startY,
+        vx: Math.cos(angle) * 190,
+        vy: Math.sin(angle) * 190,
+        life: 0.65
+      });
+    }
+
+    function update(dt) {
+      let dx = 0;
+      let dy = 0;
+
+      if (keys.has("a") || keys.has("arrowleft")) dx -= 1;
+      if (keys.has("d") || keys.has("arrowright")) dx += 1;
+      if (keys.has("w") || keys.has("arrowup")) dy -= 1;
+      if (keys.has("s") || keys.has("arrowdown")) dy += 1;
+
+      // Normalize diagonal movement so it isn't faster.
+      if (dx && dy) {
+        dx *= Math.SQRT1_2;
+        dy *= Math.SQRT1_2;
+      }
+
+      player.x = Math.max(14, Math.min(W - 14, player.x + dx * player.speed * dt));
+      player.y = Math.max(14, Math.min(H - 14, player.y + dy * player.speed * dt));
+
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        const bullet = bullets[i];
+        bullet.x += bullet.vx * dt;
+        bullet.y += bullet.vy * dt;
+        bullet.life -= dt;
+
+        if (
+          bullet.life <= 0 ||
+          bullet.x < 0 || bullet.x > W ||
+          bullet.y < 0 || bullet.y > H
+        ) {
+          bullets.splice(i, 1);
+        }
+      }
+    }
+
+    function drawRoom() {
+      ctx.fillStyle = "#526b43";
+      ctx.fillRect(0, 0, W, H);
+
+      // Simple repeating floor tiles.
+      for (let y = 8; y < H; y += 16) {
+        for (let x = 8; x < W; x += 16) {
+          if ((x / 16 + y / 16) % 2 === 0) {
+            ctx.fillStyle = "#587348";
+            ctx.fillRect(x, y, 16, 16);
+          }
+        }
+      }
+
+      // Outer stone border.
+      ctx.fillStyle = "#26372a";
+      ctx.fillRect(0, 0, W, 8);
+      ctx.fillRect(0, H - 8, W, 8);
+      ctx.fillRect(0, 0, 8, H);
+      ctx.fillRect(W - 8, 0, 8, H);
+
+      ctx.fillStyle = "#71845a";
+      for (let x = 12; x < W - 12; x += 16) {
+        ctx.fillRect(x, 2, 8, 2);
+        ctx.fillRect(x, H - 5, 8, 2);
+      }
+
+      // Decorative plants.
+      for (const plant of plants) {
+        ctx.fillStyle = "#304733";
+        ctx.fillRect(plant.x - 4, plant.y + 3, 10, 5);
+        ctx.fillStyle = "#83a95b";
+        ctx.fillRect(plant.x, plant.y - 3, 4, 8);
+        ctx.fillRect(plant.x - 4, plant.y, 4, 4);
+        ctx.fillRect(plant.x + 4, plant.y - 1, 4, 4);
+        ctx.fillStyle = "#b1c96b";
+        ctx.fillRect(plant.x, plant.y - 5, 3, 3);
+      }
+    }
+
+    function drawPlayer() {
+      const angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
+
+      // Shadow.
+      ctx.fillStyle = "#273329";
+      ctx.fillRect(Math.round(player.x - 6), Math.round(player.y + 5), 13, 4);
+
+      // Feet and body.
+      ctx.fillStyle = "#342d38";
+      ctx.fillRect(player.x - 5, player.y + 2, 4, 6);
+      ctx.fillRect(player.x + 2, player.y + 2, 4, 6);
+
+      ctx.fillStyle = "#315d91";
+      ctx.fillRect(player.x - 7, player.y - 5, 14, 11);
+      ctx.fillStyle = "#497db2";
+      ctx.fillRect(player.x - 5, player.y - 7, 10, 10);
+
+      // Head.
+      ctx.fillStyle = "#d9a77b";
+      ctx.fillRect(player.x - 4, player.y - 13, 9, 8);
+      ctx.fillStyle = "#62443d";
+      ctx.fillRect(player.x - 4, player.y - 14, 9, 3);
+
+      // Small pixel-art gun, rotated toward the mouse.
+      ctx.save();
+      ctx.translate(player.x, player.y - 1);
+      ctx.rotate(angle);
+      ctx.fillStyle = "#252a30";
+      ctx.fillRect(3, -2, 12, 4);
+      ctx.fillStyle = "#adb6aa";
+      ctx.fillRect(8, -3, 9, 2);
+      ctx.fillStyle = "#7e8d83";
+      ctx.fillRect(5, 2, 3, 4);
+      ctx.restore();
+    }
+
+    function drawBullets() {
+      for (const bullet of bullets) {
+        ctx.fillStyle = "#ffe68a";
+        ctx.fillRect(Math.round(bullet.x) - 2, Math.round(bullet.y) - 1, 4, 3);
+      }
+    }
+
+    function draw() {
+      drawRoom();
+      drawBullets();
+      drawPlayer();
+
+      // Tiny status label.
+      ctx.fillStyle = "#e8f0dd";
+      ctx.font = "7px monospace";
+      ctx.fillText("NO ENEMIES • EXPLORE", 13, 17);
+    }
+
+    function frame(time) {
+      const dt = Math.min((time - lastTime) / 1000 || 0, 0.05);
+      lastTime = time;
+      update(dt);
+      draw();
+      requestAnimationFrame(frame);
+    }
+
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>
