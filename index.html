@@ -141,7 +141,9 @@
     addEventListener("blur",()=>keys.clear());
     function shoot() {
       const now=performance.now(); if(now-lastShot<FIRE_INTERVAL_MS) return; lastShot=now;
-      bullets.push({x:player.x+aim.x*11,y:player.y+aim.y*11,vx:aim.x*190,vy:aim.y*190,life:BULLET_LIFETIME});
+      const muzzleX = player.x + aim.x * 18;
+      const muzzleY = player.y + aim.y * 18;
+      bullets.push({x:muzzleX,y:muzzleY,vx:aim.x*220,vy:aim.y*220,life:BULLET_LIFETIME});
     }
     function damagePlayer(zombie) {
       if(player.invulnerable>0||player.hp<=0) return;
@@ -185,9 +187,9 @@
       for(let wy=sy;wy<camera.y+H+TILE_SIZE;wy+=TILE_SIZE)for(let wx=sx;wx<camera.x+W+TILE_SIZE;wx+=TILE_SIZE)
         if(((wx/TILE_SIZE)+(wy/TILE_SIZE))%2===0){ctx.fillStyle="#587348";ctx.fillRect(wx-camera.x,wy-camera.y,TILE_SIZE,TILE_SIZE);}
       ctx.fillStyle="#26372a"; if(camera.y===0)ctx.fillRect(0,0,W,8);if(camera.y+H>=WORLD_HEIGHT)ctx.fillRect(0,H-8,W,8);if(camera.x===0)ctx.fillRect(0,0,8,H);if(camera.x+W>=WORLD_WIDTH)ctx.fillRect(W-8,0,8,H);
-      for(const p of plants){const x=p.x-camera.x,y=p.y-camera.y;if(x< -12||x>W+12||y< -12||y>H+12)continue;ctx.fillStyle="#304733";ctx.fillRect(x-4,y+3,10,5);ctx.fillStyle="#83a95b";ctx.fillRect(x,y-3,4,8);ctx.fillRect(x-4,y,4,4);ctx.fillRect(x+4,y-1,4,4);ctx.fillStyle="#b1c96b";ctx.fillRect(x,y-5,3,3);}
+      for(const p of plants){const x=p.x-camera.x,y=p.y-camera.y;if(x< -12||x>W+12||y< -12||y>H+12)continue;ctx.fillStyle="#304733";ctx.fillRect(x-4,y+3,10,5);ctx.fillStyle="#83a95b";ctx.fillRect(x-2,y-3,5,9);ctx.fillStyle="#c7d982";ctx.fillRect(x-1,y-9,3,6);}
     }
-    function drawMedkits(camera){for(const m of medkits){const x=Math.round(m.x-camera.x),y=Math.round(m.y-camera.y);if(x< -12||x>W+12||y< -12||y>H+12)continue;ctx.fillStyle="#263329";ctx.fillRect(x-7,y-5,15,12);ctx.fillStyle="#f2f1df";ctx.fillRect(x-6,y-6,12,10);ctx.fillStyle="#d7433e";ctx.fillRect(x-2,y-4,4,7);ctx.fillRect(x-4,y-2,8,3);ctx.fillStyle="#fff";ctx.fillRect(x-2,y-8,4,2);}}
+    function drawMedkits(camera){for(const m of medkits){const x=Math.round(m.x-camera.x),y=Math.round(m.y-camera.y);if(x< -12||x>W+12||y< -12||y>H+12)continue;ctx.fillStyle="#263329";ctx.fillRect(x-5,y-4,10,8);ctx.fillStyle="#9be4a7";ctx.fillRect(x-3,y-2,6,4);ctx.fillStyle="#2a4d31";ctx.fillRect(x-1,y-6,2,2);}}
     function drawCharacter(x,y,isZombie=false,hitFlash=false){
       ctx.fillStyle=isZombie?(hitFlash?"#ff3030":"#263329"):"#273329";ctx.fillRect(Math.round(x-6),Math.round(y+5),13,4);
       ctx.fillStyle=isZombie?(hitFlash?"#ff4a4a":"#3a3430"):"#342d38";ctx.fillRect(x-5,y+2,4,6);ctx.fillRect(x+2,y+2,4,6);
@@ -195,26 +197,18 @@
       ctx.fillStyle=isZombie?(hitFlash?"#ff4a4a":"#79a64d"):"#d9a77b";ctx.fillRect(x-4,y-13,9,8);ctx.fillStyle=isZombie?(hitFlash?"#c91f1f":"#405a38"):"#62443d";ctx.fillRect(x-4,y-14,9,3);
       if(isZombie){ctx.fillStyle=hitFlash?"#fff":"#d7e78a";ctx.fillRect(x-2,y-10,2,2);ctx.fillRect(x+2,y-10,2,2);}}
     function drawZombies(camera){for(const z of zombies){if(z.hp<=0)continue;const x=z.x-camera.x,y=z.y-camera.y;if(x< -24||x>W+24||y< -24||y>H+24)continue;drawCharacter(x,y,true,z.hitFlash>0);}}
-    function drawBullets(camera){for(const b of bullets){const x=b.x-camera.x,y=b.y-camera.y;if(x< -4||x>W+4||y< -4||y>H+4)continue;ctx.fillStyle="#ffe68a";ctx.fillRect(Math.round(x)-2,Math.round(y)-1,4,3);}}
+    function drawBullets(camera){for(const b of bullets){const x=b.x-camera.x,y=b.y-camera.y;if(x< -4||x>W+4||y< -4||y>H+4)continue;ctx.fillStyle="#ffe68a";ctx.fillRect(Math.round(x)-2,Math.round(y)-2,4,4);}}
     function drawPlayer(camera){
       const x=player.x-camera.x,y=player.y-camera.y;
       if(player.invulnerable>0&&Math.floor(player.invulnerable*12)%2===0)return;
       drawCharacter(x,y);
-      // Compact, stylized pixel-art pistol inspired by a Glock 19 silhouette.
       ctx.save();ctx.translate(x,y-1);ctx.rotate(Math.atan2(aim.y,aim.x));
-      // Textured grip and grip panels.
-      ctx.fillStyle="#20262b";ctx.fillRect(1,2,6,9);
-      ctx.fillStyle="#41484b";ctx.fillRect(2,4,4,1);ctx.fillRect(2,7,4,1);
-      // Frame and trigger guard.
-      ctx.fillStyle="#30373b";ctx.fillRect(3,0,13,4);ctx.fillRect(6,3,5,3);
-      ctx.fillStyle="#151a1d";ctx.fillRect(7,3,3,2);
-      // Squared slide, rear sight and muzzle.
-      ctx.fillStyle="#596267";ctx.fillRect(5,-4,14,4);
-      ctx.fillStyle="#858e90";ctx.fillRect(7,-3,9,1);
-      ctx.fillStyle="#252b2f";ctx.fillRect(4,-5,2,1);ctx.fillRect(17,-5,2,1);
-      ctx.fillStyle="#171c1f";ctx.fillRect(18,-3,3,2);
-      // Small slide serrations.
-      ctx.fillStyle="#30373b";ctx.fillRect(7,-2,1,2);ctx.fillRect(9,-2,1,2);
+      ctx.fillStyle="#222a2d";ctx.fillRect(4,-2,7,4);
+      ctx.fillRect(11,-2,8,4);
+      ctx.fillRect(0,-5,5,10);
+      ctx.fillRect(-2,1,4,6);
+      ctx.fillStyle="#adb6aa";ctx.fillRect(14,-3,5,2);
+      ctx.fillStyle="#7e8d83";ctx.fillRect(1,-1,3,4);
       ctx.restore();
     }
     function draw(){const camera=getCamera();drawRoom(camera);drawMedkits(camera);drawZombies(camera);drawBullets(camera);drawPlayer(camera);}
