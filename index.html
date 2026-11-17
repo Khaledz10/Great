@@ -113,15 +113,20 @@
     const BULLET_DAMAGE = 20;
     const ZOMBIE_KNOCKBACK = TILE_SIZE * 2;
     const ZOMBIE_SPAWN_INTERVAL = 10;
+    const MEDKIT_SPAWN_INTERVAL = 15;
+    const MEDKIT_HEAL = 50;
+    const MAX_MEDKITS = 6;
     let W = 320;
     let H = 180;
     let WORLD_WIDTH = 2400;
     let WORLD_HEIGHT = 1800;
     let gameStarted = false;
     let zombieSpawnTimer = 0;
+    let medkitSpawnTimer = 0;
 
     const player = { x: 1200, y: 900, speed: 78, hp: PLAYER_MAX_HP, invulnerable: 0 };
     let zombies = [];
+    let medkits = [];
     const keys = new Set();
     const bullets = [];
     const aim = { x: 1, y: 0 };
@@ -170,15 +175,17 @@
       return { x, y, speed: 38, hp: ZOMBIE_MAX_HP, chasing: false, attackCooldown: 0 };
     }
 
+    function randomWorldPoint() {
+      return {
+        x: TILE_SIZE * 2 + Math.random() * (WORLD_WIDTH - TILE_SIZE * 4),
+        y: TILE_SIZE * 2 + Math.random() * (WORLD_HEIGHT - TILE_SIZE * 4)
+      };
+    }
+
     function spawnZombie() {
-      // Choose a random map location far enough from the player and existing zombies.
-      // Reject recent spawn spots too, so each wave appears in a different place.
       let spawn = null;
       for (let attempt = 0; attempt < 80; attempt++) {
-        const candidate = {
-          x: TILE_SIZE * 2 + Math.random() * (WORLD_WIDTH - TILE_SIZE * 4),
-          y: TILE_SIZE * 2 + Math.random() * (WORLD_HEIGHT - TILE_SIZE * 4)
-        };
+        const candidate = randomWorldPoint();
         const farFromPlayer = Math.hypot(candidate.x - player.x, candidate.y - player.y) > TILE_SIZE * 8;
         const farFromZombies = zombies.every(z => Math.hypot(candidate.x - z.x, candidate.y - z.y) > TILE_SIZE * 6);
         if (farFromPlayer && farFromZombies) {
@@ -186,15 +193,24 @@
           break;
         }
       }
-
-      // Fallback still picks a valid random position if the map gets crowded.
-      if (!spawn) {
-        spawn = {
-          x: TILE_SIZE * 2 + Math.random() * (WORLD_WIDTH - TILE_SIZE * 4),
-          y: TILE_SIZE * 2 + Math.random() * (WORLD_HEIGHT - TILE_SIZE * 4)
-        };
-      }
+      if (!spawn) spawn = randomWorldPoint();
       zombies.push(makeZombie(spawn.x, spawn.y));
+    }
+
+    function spawnMedkit() {
+      if (medkits.length >= MAX_MEDKITS) return;
+      let spawn = null;
+      for (let attempt = 0; attempt < 80; attempt++) {
+        const candidate = randomWorldPoint();
+        const farFromPlayer = Math.hypot(candidate.x - player.x, candidate.y - player.y) > TILE_SIZE * 5;
+        const awayFromMedkits = medkits.every(m => Math.hypot(candidate.x - m.x, candidate.y - m.y) > TILE_SIZE * 5);
+        if (farFromPlayer && awayFromMedkits) {
+          spawn = candidate;
+          break;
+        }
+      }
+      if (!spawn) spawn = randomWorldPoint();
+      medkits.push(spawn);
     }
 
     function resetGame() {
@@ -203,7 +219,9 @@
       player.hp = PLAYER_MAX_HP;
       player.invulnerable = 0;
       zombies = [makeZombie(1304, 900)];
+      medkits = [];
       zombieSpawnTimer = 0;
+      medkitSpawnTimer = 0;
       bullets.length = 0;
       keys.clear();
       aim.x = 1;
@@ -317,6 +335,12 @@
           spawnZombie();
         }
 
+        medkitSpawnTimer += dt;
+        if (medkitSpawnTimer >= MEDKIT_SPAWN_INTERVAL) {
+          medkitSpawnTimer -= MEDKIT_SPAWN_INTERVAL;
+          spawnMedkit();
+        }
+
         for (const zombie of zombies) {
           if (zombie.hp <= 0) continue;
           zombie.attackCooldown = Math.max(0, zombie.attackCooldown - dt);
@@ -331,6 +355,18 @@
             damagePlayer(zombie);
             zombie.attackCooldown = 1;
             if (player.hp <= 0) break;
+          }
+        }
+
+        // Collect a medkit by walking over it; health never exceeds its 100 hp maximum.
+        if (player.hp < PLAYER_MAX_HP) {
+          for (let i = medkits.length - 1; i >= 0; i--) {
+            const medkit = medkits[i];
+            if (Math.hypot(player.x - medkit.x, player.y - medkit.y) < 14) {
+              player.hp = Math.min(PLAYER_MAX_HP, player.hp + MEDKIT_HEAL);
+              medkits.splice(i, 1);
+              updateHealthDisplay();
+            }
           }
         }
       }
@@ -395,6 +431,24 @@
       }
     }
 
+    function drawMedkits(camera) {
+      for (const medkit of medkits) {
+        const x = Math.round(medkit.x - camera.x);
+        const y = Math.round(medkit.y - camera.y);
+        if (x < -12 || x > W + 12 || y < -12 || y > H + 12) continue;
+        // Pixel-art white first-aid pack with a red cross.
+        ctx.fillStyle = "#263329";
+        ctx.fillRect(x - 7, y - 5, 15, 12);
+        ctx.fillStyle = "#f2f1df";
+        ctx.fillRect(x - 6, y - 6, 12, 10);
+        ctx.fillStyle = "#d7433e";
+        ctx.fillRect(x - 2, y - 4, 4, 7);
+        ctx.fillRect(x - 4, y - 2, 8, 3);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(x - 2, y - 8, 4, 2);
+      }
+    }
+
     function drawCharacter(x, y, isZombie = false) {
       ctx.fillStyle = isZombie ? "#263329" : "#273329";
       ctx.fillRect(Math.round(x - 6), Math.round(y + 5), 13, 4);
@@ -456,6 +510,7 @@
     function draw() {
       const camera = getCamera();
       drawRoom(camera);
+      drawMedkits(camera);
       drawZombies(camera);
       drawBullets(camera);
       drawPlayer(camera);
