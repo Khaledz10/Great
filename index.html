@@ -87,7 +87,7 @@
 
     <p class="help">
       <strong>Move:</strong> WASD &nbsp;·&nbsp;
-      <strong>Aim:</strong> Arrow keys (diagonal works) &nbsp;·&nbsp;
+      <strong>Aim:</strong> Arrow keys (diagonal works; direction stays aimed) &nbsp;·&nbsp;
       <strong>Fire:</strong> Space
     </p>
   </main>
@@ -103,7 +103,7 @@
     const player = { x: W / 2, y: H / 2, speed: 78 };
     const keys = new Set();
     const bullets = [];
-    let mouse = { x: player.x + 30, y: player.y };
+    const aim = { x: 1, y: 0 };
     let lastTime = 0;
     let lastShot = 0;
 
@@ -112,19 +112,7 @@
       { x: 69, y: 146 }, { x: 278, y: 132 }
     ];
 
-    function pointerPosition(event) {
-      const rect = canvas.getBoundingClientRect();
-      return {
-        x: (event.clientX - rect.left) * W / rect.width,
-        y: (event.clientY - rect.top) * H / rect.height
-      };
-    }
-
-    canvas.addEventListener("pointermove", event => {
-      mouse = pointerPosition(event);
-    });
-
-    function getAimVector() {
+    function updateAimFromKeys() {
       let aimX = 0;
       let aimY = 0;
 
@@ -133,34 +121,12 @@
       if (keys.has("arrowup")) aimY -= 1;
       if (keys.has("arrowdown")) aimY += 1;
 
+      // Keep the last aim direction when no arrow key is held.
       if (aimX !== 0 || aimY !== 0) {
-        const length = Math.hypot(aimX, aimY) || 1;
-        return { x: aimX / length, y: aimY / length };
+        const length = Math.hypot(aimX, aimY);
+        aim.x = aimX / length;
+        aim.y = aimY / length;
       }
-
-      return { x: mouse.x - player.x, y: mouse.y - player.y };
-    }
-
-    function shoot() {
-      const now = performance.now();
-      if (now - lastShot < 180) return;
-      lastShot = now;
-
-      const aim = getAimVector();
-      const length = Math.hypot(aim.x, aim.y) || 1;
-      const dirX = aim.x / length;
-      const dirY = aim.y / length;
-
-      const startX = player.x + dirX * 11;
-      const startY = player.y + dirY * 11;
-
-      bullets.push({
-        x: startX,
-        y: startY,
-        vx: dirX * 190,
-        vy: dirY * 190,
-        life: 0.65
-      });
     }
 
     window.addEventListener("keydown", event => {
@@ -169,22 +135,35 @@
       if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) {
         event.preventDefault();
         keys.add(key);
+        updateAimFromKeys();
       }
 
       if (key === " " || event.code === "Space") {
         event.preventDefault();
         if (!event.repeat) shoot();
-        keys.add("space");
       }
     });
 
     window.addEventListener("keyup", event => {
-      const key = event.key.toLowerCase();
-      keys.delete(key);
-      if (key === " " || event.code === "Space") keys.delete("space");
+      keys.delete(event.key.toLowerCase());
+      updateAimFromKeys();
     });
 
     window.addEventListener("blur", () => keys.clear());
+
+    function shoot() {
+      const now = performance.now();
+      if (now - lastShot < 180) return;
+      lastShot = now;
+
+      bullets.push({
+        x: player.x + aim.x * 11,
+        y: player.y + aim.y * 11,
+        vx: aim.x * 190,
+        vy: aim.y * 190,
+        life: 0.65
+      });
+    }
 
     function update(dt) {
       let dx = 0;
@@ -257,7 +236,6 @@
     }
 
     function drawPlayer() {
-      const aim = getAimVector();
       const angle = Math.atan2(aim.y, aim.x);
 
       ctx.fillStyle = "#273329";
