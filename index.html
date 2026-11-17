@@ -42,15 +42,29 @@
       border: 1px solid #71845a; font-size: .9rem; line-height: 1.65;
     }
     .controls strong { color: #c8ef91; }
+    .hud {
+      position: fixed; top: 18px; left: 18px; width: min(250px, 45vw);
+      padding: 10px 12px; background: rgba(14, 25, 17, .88);
+      border: 1px solid #71845a; color: #f1f5e9; font-weight: 800;
+      text-shadow: 1px 1px #000;
+    }
+    .health-track { height: 12px; margin-top: 6px; background: #352d2b; border: 1px solid #8a9b79; }
+    .health-fill { width: 100%; height: 100%; background: #77c957; transition: width .12s linear; }
     .hidden { display: none; }
     @media (max-width: 600px) {
       .menu-card { padding: 28px 20px; }
       .controls { right: 12px; bottom: 12px; font-size: .78rem; }
+      .hud { top: 10px; left: 10px; }
     }
   </style>
 </head>
 <body>
   <canvas id="game" aria-label="Pixel Survivor game"></canvas>
+
+  <div class="hud hidden" id="hud" aria-live="polite">
+    <span id="healthText">100 hp</span>
+    <div class="health-track"><div class="health-fill" id="healthFill"></div></div>
+  </div>
 
   <section class="menu" id="menu" aria-label="Main menu">
     <div class="menu-card">
@@ -76,19 +90,26 @@
 
     const TILE_SIZE = 16;
     const ZOMBIE_AGGRO_RANGE = TILE_SIZE * 5;
+    const PLAYER_MAX_HP = 100;
+    const ZOMBIE_MAX_HP = 100;
+    const ZOMBIE_DAMAGE = 25;
+    const ZOMBIE_KNOCKBACK = TILE_SIZE * 2;
     let W = 320;
     let H = 180;
     let WORLD_WIDTH = 2400;
     let WORLD_HEIGHT = 1800;
     let gameStarted = false;
 
-    const player = { x: 1200, y: 900, speed: 78 };
-    const zombie = { x: 1304, y: 900, speed: 38, chasing: false };
+    const player = { x: 1200, y: 900, speed: 78, hp: PLAYER_MAX_HP, invulnerable: 0 };
+    const zombie = { x: 1304, y: 900, speed: 38, hp: ZOMBIE_MAX_HP, chasing: false, attackCooldown: 0 };
     const keys = new Set();
     const bullets = [];
     const aim = { x: 1, y: 0 };
     let lastTime = 0;
     let lastShot = 0;
+
+    const healthText = document.getElementById("healthText");
+    const healthFill = document.getElementById("healthFill");
 
     const plants = [
       { x: 45, y: 42 }, { x: 263, y: 36 }, { x: 69, y: 146 }, { x: 278, y: 132 },
@@ -99,6 +120,12 @@
       { x: 450, y: 1500 }, { x: 800, y: 1330 }, { x: 1600, y: 1550 }, { x: 2250, y: 1050 },
       { x: 1050, y: 450 }, { x: 1550, y: 780 }, { x: 350, y: 1150 }, { x: 1850, y: 950 }
     ];
+
+    function updateHealthDisplay() {
+      healthText.textContent = `${player.hp} hp`;
+      healthFill.style.width = `${player.hp}%`;
+      healthFill.style.background = player.hp <= 25 ? "#e34d4d" : player.hp <= 50 ? "#e5a83b" : "#77c957";
+    }
 
     function resizeCanvas() {
       const pixelScale = Math.max(1, Math.floor(Math.min(innerWidth / 320, innerHeight / 180)));
@@ -119,6 +146,8 @@
     document.getElementById("startButton").addEventListener("click", () => {
       gameStarted = true;
       document.getElementById("menu").classList.add("hidden");
+      document.getElementById("hud").classList.remove("hidden");
+      updateHealthDisplay();
       canvas.focus();
     });
 
@@ -138,10 +167,8 @@
 
     window.addEventListener("keydown", event => {
       const key = event.key.toLowerCase();
-      if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(key)) {
-        event.preventDefault();
-      }
-      if (!gameStarted) return;
+      if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(key)) event.preventDefault();
+      if (!gameStarted || player.hp <= 0) return;
       if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) {
         keys.add(key);
         updateAimFromKeys();
@@ -168,8 +195,29 @@
       });
     }
 
+    function damagePlayer() {
+      if (player.invulnerable > 0 || player.hp <= 0) return;
+      player.hp = Math.max(0, player.hp - ZOMBIE_DAMAGE);
+      player.invulnerable = 0.8;
+
+      // Push the player two tiles directly away from the zombie.
+      let awayX = player.x - zombie.x;
+      let awayY = player.y - zombie.y;
+      let distance = Math.hypot(awayX, awayY);
+      if (distance === 0) {
+        awayX = 1;
+        awayY = 0;
+        distance = 1;
+      }
+      player.x = Math.max(14, Math.min(WORLD_WIDTH - 14, player.x + (awayX / distance) * ZOMBIE_KNOCKBACK));
+      player.y = Math.max(14, Math.min(WORLD_HEIGHT - 14, player.y + (awayY / distance) * ZOMBIE_KNOCKBACK));
+      updateHealthDisplay();
+    }
+
     function update(dt) {
-      if (gameStarted) {
+      if (player.invulnerable > 0) player.invulnerable = Math.max(0, player.invulnerable - dt);
+
+      if (gameStarted && player.hp > 0) {
         let dx = 0;
         let dy = 0;
         if (keys.has("a")) dx -= 1;
@@ -183,13 +231,20 @@
         player.x = Math.max(14, Math.min(WORLD_WIDTH - 14, player.x + dx * player.speed * dt));
         player.y = Math.max(14, Math.min(WORLD_HEIGHT - 14, player.y + dy * player.speed * dt));
 
-        const toPlayerX = player.x - zombie.x;
-        const toPlayerY = player.y - zombie.y;
-        const distance = Math.hypot(toPlayerX, toPlayerY);
-        zombie.chasing = distance <= ZOMBIE_AGGRO_RANGE;
-        if (zombie.chasing && distance > 0) {
-          zombie.x += (toPlayerX / distance) * zombie.speed * dt;
-          zombie.y += (toPlayerY / distance) * zombie.speed * dt;
+        if (zombie.hp > 0) {
+          zombie.attackCooldown = Math.max(0, zombie.attackCooldown - dt);
+          const toPlayerX = player.x - zombie.x;
+          const toPlayerY = player.y - zombie.y;
+          const distance = Math.hypot(toPlayerX, toPlayerY);
+          zombie.chasing = distance <= ZOMBIE_AGGRO_RANGE;
+
+          if (distance > 18 && zombie.chasing && distance > 0) {
+            zombie.x += (toPlayerX / distance) * zombie.speed * dt;
+            zombie.y += (toPlayerY / distance) * zombie.speed * dt;
+          } else if (distance <= 18 && zombie.attackCooldown <= 0) {
+            damagePlayer();
+            zombie.attackCooldown = 1;
+          }
         }
       }
 
@@ -198,6 +253,13 @@
         bullet.x += bullet.vx * dt;
         bullet.y += bullet.vy * dt;
         bullet.life -= dt;
+
+        if (zombie.hp > 0 && Math.hypot(bullet.x - zombie.x, bullet.y - zombie.y) < 11) {
+          zombie.hp = Math.max(0, zombie.hp - 25);
+          bullets.splice(i, 1);
+          continue;
+        }
+
         if (bullet.life <= 0 || bullet.x < 0 || bullet.x > WORLD_WIDTH || bullet.y < 0 || bullet.y > WORLD_HEIGHT) {
           bullets.splice(i, 1);
         }
@@ -224,7 +286,6 @@
           }
         }
       }
-
       ctx.fillStyle = "#26372a";
       if (camera.y === 0) ctx.fillRect(0, 0, W, 8);
       if (camera.y + H >= WORLD_HEIGHT) ctx.fillRect(0, H - 8, W, 8);
@@ -247,7 +308,6 @@
     }
 
     function drawCharacter(x, y, isZombie = false) {
-      // Same pixel-art body for both characters; the zombie has a sickly green head.
       ctx.fillStyle = isZombie ? "#263329" : "#273329";
       ctx.fillRect(Math.round(x - 6), Math.round(y + 5), 13, 4);
       ctx.fillStyle = isZombie ? "#3a3430" : "#342d38";
@@ -271,6 +331,7 @@
     function drawPlayer(camera) {
       const x = player.x - camera.x;
       const y = player.y - camera.y;
+      if (player.invulnerable > 0 && Math.floor(player.invulnerable * 12) % 2 === 0) return;
       drawCharacter(x, y);
       ctx.save();
       ctx.translate(x, y - 1);
@@ -285,6 +346,7 @@
     }
 
     function drawZombie(camera) {
+      if (zombie.hp <= 0) return;
       const x = zombie.x - camera.x;
       const y = zombie.y - camera.y;
       if (x < -24 || x > W + 24 || y < -24 || y > H + 24) return;
@@ -307,6 +369,15 @@
       drawZombie(camera);
       drawBullets(camera);
       drawPlayer(camera);
+      if (gameStarted && player.hp <= 0) {
+        ctx.fillStyle = "rgba(10, 15, 12, .72)";
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = "#f1f5e9";
+        ctx.textAlign = "center";
+        ctx.font = "bold 18px monospace";
+        ctx.fillText("YOU WERE CAUGHT", W / 2, H / 2);
+        ctx.textAlign = "start";
+      }
     }
 
     function frame(time) {
