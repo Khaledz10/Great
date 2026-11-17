@@ -7,72 +7,39 @@
   <style>
     * { box-sizing: border-box; }
     html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
-    body {
-      color: #e8f0dd;
-      background: #101914;
-      font-family: system-ui, sans-serif;
-    }
-    canvas {
-      display: block;
-      width: 100vw;
-      height: 100vh;
-      image-rendering: pixelated;
-    }
+    body { color: #e8f0dd; background: #101914; font-family: system-ui, sans-serif; }
+    canvas { display: block; width: 100vw; height: 100vh; image-rendering: pixelated; }
     .menu {
-      position: fixed;
-      inset: 0;
-      display: grid;
-      place-items: center;
+      position: fixed; inset: 0; display: grid; place-items: center;
       padding: 24px;
       background: linear-gradient(135deg, rgba(10, 20, 15, .88), rgba(15, 25, 20, .72));
     }
     .menu-card {
-      width: min(440px, 100%);
-      padding: 36px;
-      text-align: center;
-      background: rgba(25, 39, 29, .96);
-      border: 3px solid #71845a;
+      width: min(440px, 100%); padding: 36px; text-align: center;
+      background: rgba(25, 39, 29, .96); border: 3px solid #71845a;
       box-shadow: 0 16px 60px #0009;
     }
     h1 {
-      margin: 0 0 8px;
-      color: #c8ef91;
-      font-size: clamp(2.4rem, 8vw, 4.5rem);
-      line-height: 1;
-      letter-spacing: .04em;
-      text-shadow: 4px 4px 0 #344b31;
+      margin: 0 0 8px; color: #c8ef91;
+      font-size: clamp(2.4rem, 8vw, 4.5rem); line-height: 1;
+      letter-spacing: .04em; text-shadow: 4px 4px 0 #344b31;
     }
     .tagline { margin: 0 0 28px; color: #b5c3a9; }
     .menu-buttons { display: grid; gap: 12px; }
     .menu button {
-      width: 100%;
-      padding: 13px 18px;
-      color: #142012;
-      background: #c8ef91;
-      border: 2px solid #e1f6b9;
-      font: inherit;
-      font-size: 1.05rem;
-      font-weight: 800;
-      cursor: pointer;
+      width: 100%; padding: 13px 18px; color: #142012; background: #c8ef91;
+      border: 2px solid #e1f6b9; font: inherit; font-size: 1.05rem;
+      font-weight: 800; cursor: pointer;
     }
     .menu button:hover:not(:disabled) { background: #e1f6b9; }
     .menu button:disabled {
-      color: #a4ad9c;
-      background: #394438;
-      border-color: #566450;
-      cursor: not-allowed;
+      color: #a4ad9c; background: #394438; border-color: #566450; cursor: not-allowed;
     }
     .coming-soon { margin-left: 6px; font-size: .75rem; font-weight: 500; }
     .controls {
-      position: fixed;
-      right: 24px;
-      bottom: 20px;
-      padding: 12px 16px;
-      color: #dce8d1;
-      background: rgba(14, 25, 17, .9);
-      border: 1px solid #71845a;
-      font-size: .9rem;
-      line-height: 1.65;
+      position: fixed; right: 24px; bottom: 20px; padding: 12px 16px;
+      color: #dce8d1; background: rgba(14, 25, 17, .9);
+      border: 1px solid #71845a; font-size: .9rem; line-height: 1.65;
     }
     .controls strong { color: #c8ef91; }
     .hidden { display: none; }
@@ -88,7 +55,7 @@
   <section class="menu" id="menu" aria-label="Main menu">
     <div class="menu-card">
       <h1>Pixel<br />Survivor</h1>
-      <p class="tagline">Explore the pixel world. No enemies yet.</p>
+      <p class="tagline">A zombie is out there. Keep your distance!</p>
       <div class="menu-buttons">
         <button id="startButton" type="button">Start Game</button>
         <button type="button" disabled aria-disabled="true">Weapons <span class="coming-soon">Coming soon</span></button>
@@ -108,14 +75,15 @@
     ctx.imageSmoothingEnabled = false;
 
     const TILE_SIZE = 16;
+    const ZOMBIE_AGGRO_RANGE = TILE_SIZE * 5;
     let W = 320;
     let H = 180;
     let WORLD_WIDTH = 2400;
     let WORLD_HEIGHT = 1800;
-    let pixelScale = 1;
     let gameStarted = false;
 
     const player = { x: 1200, y: 900, speed: 78 };
+    const zombie = { x: 1304, y: 900, speed: 38, chasing: false };
     const keys = new Set();
     const bullets = [];
     const aim = { x: 1, y: 0 };
@@ -133,8 +101,7 @@
     ];
 
     function resizeCanvas() {
-      // Render at a low internal resolution and enlarge with pixelated scaling.
-      pixelScale = Math.max(1, Math.floor(Math.min(innerWidth / 320, innerHeight / 180)));
+      const pixelScale = Math.max(1, Math.floor(Math.min(innerWidth / 320, innerHeight / 180)));
       W = Math.ceil(innerWidth / pixelScale);
       H = Math.ceil(innerHeight / pixelScale);
       canvas.width = W;
@@ -215,6 +182,15 @@
         }
         player.x = Math.max(14, Math.min(WORLD_WIDTH - 14, player.x + dx * player.speed * dt));
         player.y = Math.max(14, Math.min(WORLD_HEIGHT - 14, player.y + dy * player.speed * dt));
+
+        const toPlayerX = player.x - zombie.x;
+        const toPlayerY = player.y - zombie.y;
+        const distance = Math.hypot(toPlayerX, toPlayerY);
+        zombie.chasing = distance <= ZOMBIE_AGGRO_RANGE;
+        if (zombie.chasing && distance > 0) {
+          zombie.x += (toPlayerX / distance) * zombie.speed * dt;
+          zombie.y += (toPlayerY / distance) * zombie.speed * dt;
+        }
       }
 
       for (let i = bullets.length - 1; i >= 0; i--) {
@@ -270,23 +246,32 @@
       }
     }
 
+    function drawCharacter(x, y, isZombie = false) {
+      // Same pixel-art body for both characters; the zombie has a sickly green head.
+      ctx.fillStyle = isZombie ? "#263329" : "#273329";
+      ctx.fillRect(Math.round(x - 6), Math.round(y + 5), 13, 4);
+      ctx.fillStyle = isZombie ? "#3a3430" : "#342d38";
+      ctx.fillRect(x - 5, y + 2, 4, 6);
+      ctx.fillRect(x + 2, y + 2, 4, 6);
+      ctx.fillStyle = isZombie ? "#59604a" : "#315d91";
+      ctx.fillRect(x - 7, y - 5, 14, 11);
+      ctx.fillStyle = isZombie ? "#70764d" : "#497db2";
+      ctx.fillRect(x - 5, y - 7, 10, 10);
+      ctx.fillStyle = isZombie ? "#79a64d" : "#d9a77b";
+      ctx.fillRect(x - 4, y - 13, 9, 8);
+      ctx.fillStyle = isZombie ? "#405a38" : "#62443d";
+      ctx.fillRect(x - 4, y - 14, 9, 3);
+      if (isZombie) {
+        ctx.fillStyle = "#d7e78a";
+        ctx.fillRect(x - 2, y - 10, 2, 2);
+        ctx.fillRect(x + 2, y - 10, 2, 2);
+      }
+    }
+
     function drawPlayer(camera) {
       const x = player.x - camera.x;
       const y = player.y - camera.y;
-      ctx.fillStyle = "#273329";
-      ctx.fillRect(Math.round(x - 6), Math.round(y + 5), 13, 4);
-      ctx.fillStyle = "#342d38";
-      ctx.fillRect(x - 5, y + 2, 4, 6);
-      ctx.fillRect(x + 2, y + 2, 4, 6);
-      ctx.fillStyle = "#315d91";
-      ctx.fillRect(x - 7, y - 5, 14, 11);
-      ctx.fillStyle = "#497db2";
-      ctx.fillRect(x - 5, y - 7, 10, 10);
-      ctx.fillStyle = "#d9a77b";
-      ctx.fillRect(x - 4, y - 13, 9, 8);
-      ctx.fillStyle = "#62443d";
-      ctx.fillRect(x - 4, y - 14, 9, 3);
-
+      drawCharacter(x, y);
       ctx.save();
       ctx.translate(x, y - 1);
       ctx.rotate(Math.atan2(aim.y, aim.x));
@@ -297,6 +282,13 @@
       ctx.fillStyle = "#7e8d83";
       ctx.fillRect(5, 2, 3, 4);
       ctx.restore();
+    }
+
+    function drawZombie(camera) {
+      const x = zombie.x - camera.x;
+      const y = zombie.y - camera.y;
+      if (x < -24 || x > W + 24 || y < -24 || y > H + 24) return;
+      drawCharacter(x, y, true);
     }
 
     function drawBullets(camera) {
@@ -312,6 +304,7 @@
     function draw() {
       const camera = getCamera();
       drawRoom(camera);
+      drawZombie(camera);
       drawBullets(camera);
       drawPlayer(camera);
     }
