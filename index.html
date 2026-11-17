@@ -44,26 +44,18 @@
   <script>
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
-    const TILE_SIZE = 16;
-    const PLAYER_MAX_HP = 100;
-    const ZOMBIE_AGGRO_RANGE = TILE_SIZE * 5;
-    const ZOMBIE_SPAWN_INTERVAL = 5;
-    const MEDKIT_SPAWN_INTERVAL = 7.5;
-    const MEDKIT_HEAL = 50;
-    const ZOMBIE_DAMAGE = 25;
-    const BULLET_DAMAGE = 20;
-    const ZOMBIE_KNOCKBACK = TILE_SIZE * 2;
-    const MAX_MEDKITS = 6;
+    const TILE_SIZE = 16, PLAYER_MAX_HP = 100;
+    const ZOMBIE_AGGRO_RANGE = TILE_SIZE * 5, ZOMBIE_SPAWN_INTERVAL = 5;
+    const MEDKIT_SPAWN_INTERVAL = 7.5, MEDKIT_HEAL = 50;
+    const ZOMBIE_DAMAGE = 25, BULLET_DAMAGE = 20, ZOMBIE_KNOCKBACK = TILE_SIZE * 2;
     let W = 320, H = 180, WORLD_WIDTH = 2400, WORLD_HEIGHT = 1800;
     let gameStarted = false, zombieSpawnTimer = 0, medkitSpawnTimer = 0;
     const player = { x: 1200, y: 900, speed: 78, hp: PLAYER_MAX_HP, invulnerable: 0 };
     let zombies = [], medkits = [];
     const bullets = [], keys = new Set(), aim = { x: 1, y: 0 };
     let lastTime = 0, lastShot = 0, audioContext = null;
-    const healthText = document.getElementById("healthText");
-    const healthFill = document.getElementById("healthFill");
-    const menu = document.getElementById("menu"), hud = document.getElementById("hud");
-    const deathScreen = document.getElementById("deathScreen");
+    const healthText = document.getElementById("healthText"), healthFill = document.getElementById("healthFill");
+    const menu = document.getElementById("menu"), hud = document.getElementById("hud"), deathScreen = document.getElementById("deathScreen");
     const plants = [
       {x:45,y:42},{x:263,y:36},{x:69,y:146},{x:278,y:132},{x:390,y:270},{x:610,y:190},{x:820,y:350},{x:1250,y:230},
       {x:1450,y:510},{x:300,y:700},{x:560,y:940},{x:980,y:820},{x:1380,y:1050},{x:1120,y:1090},{x:170,y:1060},{x:760,y:650},
@@ -87,26 +79,20 @@
     }
     addEventListener("resize", resizeCanvas); resizeCanvas();
     function makeZombie(x, y) { return {x,y,speed:38,hp:100,chasing:false,attackCooldown:0}; }
+
+    // Uniform random positions across the entire playable world (inside its edge).
     function randomWorldPoint() {
-      return {x:TILE_SIZE*2 + Math.random()*(WORLD_WIDTH-TILE_SIZE*4), y:TILE_SIZE*2 + Math.random()*(WORLD_HEIGHT-TILE_SIZE*4)};
+      return { x: TILE_SIZE + Math.random() * (WORLD_WIDTH - TILE_SIZE * 2),
+               y: TILE_SIZE + Math.random() * (WORLD_HEIGHT - TILE_SIZE * 2) };
     }
     function spawnZombie() {
-      let point = null;
-      for (let n=0;n<80;n++) {
-        const p=randomWorldPoint();
-        if (Math.hypot(p.x-player.x,p.y-player.y)>TILE_SIZE*8 && zombies.every(z=>Math.hypot(p.x-z.x,p.y-z.y)>TILE_SIZE*6)) { point=p; break; }
-      }
-      if (!point) point=randomWorldPoint();
-      zombies.push(makeZombie(point.x,point.y));
+      const point = randomWorldPoint();
+      zombies.push(makeZombie(point.x, point.y));
     }
     function spawnMedkit() {
-      if (medkits.length >= MAX_MEDKITS) return;
-      let point = null;
-      for (let n=0;n<80;n++) {
-        const p=randomWorldPoint();
-        if (Math.hypot(p.x-player.x,p.y-player.y)>TILE_SIZE*5 && medkits.every(m=>Math.hypot(p.x-m.x,p.y-m.y)>TILE_SIZE*5)) { point=p; break; }
-      }
-      medkits.push(point || randomWorldPoint());
+      // No field cap or distance/spacing restrictions: medkits can appear anywhere on the map.
+      const point = randomWorldPoint();
+      medkits.push(point);
     }
     function playPickupSound() {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
