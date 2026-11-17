@@ -86,9 +86,9 @@
     </div>
 
     <p class="help">
-      <strong>Move:</strong> WASD or arrow keys &nbsp;·&nbsp;
-      <strong>Aim:</strong> mouse &nbsp;·&nbsp;
-      <strong>Fire:</strong> click
+      <strong>Move:</strong> WASD &nbsp;·&nbsp;
+      <strong>Aim:</strong> Arrow keys (diagonal works) &nbsp;·&nbsp;
+      <strong>Fire:</strong> Space
     </p>
   </main>
 
@@ -107,7 +107,6 @@
     let lastTime = 0;
     let lastShot = 0;
 
-    // Fixed little decorations keep the room looking consistent.
     const plants = [
       { x: 45, y: 42 }, { x: 263, y: 36 },
       { x: 69, y: 146 }, { x: 278, y: 132 }
@@ -125,54 +124,77 @@
       mouse = pointerPosition(event);
     });
 
-    canvas.addEventListener("pointerdown", event => {
-      if (event.button !== 0) return;
-      mouse = pointerPosition(event);
-      shoot();
-    });
+    function getAimVector() {
+      let aimX = 0;
+      let aimY = 0;
 
-    window.addEventListener("keydown", event => {
-      const key = event.key.toLowerCase();
-      if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) {
-        event.preventDefault();
-        keys.add(key);
+      if (keys.has("arrowleft")) aimX -= 1;
+      if (keys.has("arrowright")) aimX += 1;
+      if (keys.has("arrowup")) aimY -= 1;
+      if (keys.has("arrowdown")) aimY += 1;
+
+      if (aimX !== 0 || aimY !== 0) {
+        const length = Math.hypot(aimX, aimY) || 1;
+        return { x: aimX / length, y: aimY / length };
       }
-    });
 
-    window.addEventListener("keyup", event => {
-      keys.delete(event.key.toLowerCase());
-    });
-
-    window.addEventListener("blur", () => keys.clear());
+      return { x: mouse.x - player.x, y: mouse.y - player.y };
+    }
 
     function shoot() {
       const now = performance.now();
       if (now - lastShot < 180) return;
       lastShot = now;
 
-      const angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
-      const startX = player.x + Math.cos(angle) * 11;
-      const startY = player.y + Math.sin(angle) * 11;
+      const aim = getAimVector();
+      const length = Math.hypot(aim.x, aim.y) || 1;
+      const dirX = aim.x / length;
+      const dirY = aim.y / length;
+
+      const startX = player.x + dirX * 11;
+      const startY = player.y + dirY * 11;
 
       bullets.push({
         x: startX,
         y: startY,
-        vx: Math.cos(angle) * 190,
-        vy: Math.sin(angle) * 190,
+        vx: dirX * 190,
+        vy: dirY * 190,
         life: 0.65
       });
     }
+
+    window.addEventListener("keydown", event => {
+      const key = event.key.toLowerCase();
+
+      if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) {
+        event.preventDefault();
+        keys.add(key);
+      }
+
+      if (key === " " || event.code === "Space") {
+        event.preventDefault();
+        if (!event.repeat) shoot();
+        keys.add("space");
+      }
+    });
+
+    window.addEventListener("keyup", event => {
+      const key = event.key.toLowerCase();
+      keys.delete(key);
+      if (key === " " || event.code === "Space") keys.delete("space");
+    });
+
+    window.addEventListener("blur", () => keys.clear());
 
     function update(dt) {
       let dx = 0;
       let dy = 0;
 
-      if (keys.has("a") || keys.has("arrowleft")) dx -= 1;
-      if (keys.has("d") || keys.has("arrowright")) dx += 1;
-      if (keys.has("w") || keys.has("arrowup")) dy -= 1;
-      if (keys.has("s") || keys.has("arrowdown")) dy += 1;
+      if (keys.has("a")) dx -= 1;
+      if (keys.has("d")) dx += 1;
+      if (keys.has("w")) dy -= 1;
+      if (keys.has("s")) dy += 1;
 
-      // Normalize diagonal movement so it isn't faster.
       if (dx && dy) {
         dx *= Math.SQRT1_2;
         dy *= Math.SQRT1_2;
@@ -201,7 +223,6 @@
       ctx.fillStyle = "#526b43";
       ctx.fillRect(0, 0, W, H);
 
-      // Simple repeating floor tiles.
       for (let y = 8; y < H; y += 16) {
         for (let x = 8; x < W; x += 16) {
           if ((x / 16 + y / 16) % 2 === 0) {
@@ -211,7 +232,6 @@
         }
       }
 
-      // Outer stone border.
       ctx.fillStyle = "#26372a";
       ctx.fillRect(0, 0, W, 8);
       ctx.fillRect(0, H - 8, W, 8);
@@ -224,7 +244,6 @@
         ctx.fillRect(x, H - 5, 8, 2);
       }
 
-      // Decorative plants.
       for (const plant of plants) {
         ctx.fillStyle = "#304733";
         ctx.fillRect(plant.x - 4, plant.y + 3, 10, 5);
@@ -238,13 +257,12 @@
     }
 
     function drawPlayer() {
-      const angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
+      const aim = getAimVector();
+      const angle = Math.atan2(aim.y, aim.x);
 
-      // Shadow.
       ctx.fillStyle = "#273329";
       ctx.fillRect(Math.round(player.x - 6), Math.round(player.y + 5), 13, 4);
 
-      // Feet and body.
       ctx.fillStyle = "#342d38";
       ctx.fillRect(player.x - 5, player.y + 2, 4, 6);
       ctx.fillRect(player.x + 2, player.y + 2, 4, 6);
@@ -254,13 +272,11 @@
       ctx.fillStyle = "#497db2";
       ctx.fillRect(player.x - 5, player.y - 7, 10, 10);
 
-      // Head.
       ctx.fillStyle = "#d9a77b";
       ctx.fillRect(player.x - 4, player.y - 13, 9, 8);
       ctx.fillStyle = "#62443d";
       ctx.fillRect(player.x - 4, player.y - 14, 9, 3);
 
-      // Small pixel-art gun, rotated toward the mouse.
       ctx.save();
       ctx.translate(player.x, player.y - 1);
       ctx.rotate(angle);
@@ -285,7 +301,6 @@
       drawBullets();
       drawPlayer();
 
-      // Tiny status label.
       ctx.fillStyle = "#e8f0dd";
       ctx.font = "7px monospace";
       ctx.fillText("NO ENEMIES • EXPLORE", 13, 17);
