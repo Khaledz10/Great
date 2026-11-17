@@ -9,144 +9,66 @@
     html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
     body { color: #e8f0dd; background: #101914; font-family: system-ui, sans-serif; }
     canvas { display: block; width: 100vw; height: 100vh; image-rendering: pixelated; }
-    .menu, .death-screen {
-      position: fixed; inset: 0; display: grid; place-items: center; padding: 24px;
-    }
-    .menu { background: linear-gradient(135deg, rgba(10, 20, 15, .88), rgba(15, 25, 20, .72)); }
-    .menu-card {
-      width: min(440px, 100%); padding: 36px; text-align: center;
-      background: rgba(25, 39, 29, .96); border: 3px solid #71845a;
-      box-shadow: 0 16px 60px #0009;
-    }
-    h1 {
-      margin: 0 0 8px; color: #c8ef91;
-      font-size: clamp(2.4rem, 8vw, 4.5rem); line-height: 1;
-      letter-spacing: .04em; text-shadow: 4px 4px 0 #344b31;
-    }
+    .menu, .death-screen { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; }
+    .menu { background: linear-gradient(135deg, rgba(10,20,15,.88), rgba(15,25,20,.72)); }
+    .menu-card { width: min(440px,100%); padding: 36px; text-align: center; background: rgba(25,39,29,.96); border: 3px solid #71845a; box-shadow: 0 16px 60px #0009; }
+    h1 { margin: 0 0 8px; color: #c8ef91; font-size: clamp(2.4rem,8vw,4.5rem); line-height: 1; letter-spacing: .04em; text-shadow: 4px 4px 0 #344b31; }
     .tagline { margin: 0 0 28px; color: #b5c3a9; }
     .menu-buttons { display: grid; gap: 12px; }
-    .menu button {
-      width: 100%; padding: 13px 18px; color: #142012; background: #c8ef91;
-      border: 2px solid #e1f6b9; font: inherit; font-size: 1.05rem;
-      font-weight: 800; cursor: pointer;
-    }
+    .menu button { width: 100%; padding: 13px 18px; color: #142012; background: #c8ef91; border: 2px solid #e1f6b9; font: inherit; font-size: 1.05rem; font-weight: 800; cursor: pointer; }
     .menu button:hover:not(:disabled) { background: #e1f6b9; }
-    .menu button:disabled {
-      color: #a4ad9c; background: #394438; border-color: #566450; cursor: not-allowed;
-    }
+    .menu button:disabled { color: #a4ad9c; background: #394438; border-color: #566450; cursor: not-allowed; }
     .coming-soon { margin-left: 6px; font-size: .75rem; font-weight: 500; }
-    .controls {
-      position: fixed; right: 24px; bottom: 20px; padding: 12px 16px;
-      color: #dce8d1; background: rgba(14, 25, 17, .9);
-      border: 1px solid #71845a; font-size: .9rem; line-height: 1.65;
-    }
+    .controls { position: fixed; right: 24px; bottom: 20px; padding: 12px 16px; color: #dce8d1; background: rgba(14,25,17,.9); border: 1px solid #71845a; font-size: .9rem; line-height: 1.65; }
     .controls strong { color: #c8ef91; }
-    .hud {
-      position: fixed; top: 18px; left: 18px; width: min(250px, 45vw);
-      padding: 10px 12px; background: rgba(14, 25, 17, .88);
-      border: 1px solid #71845a; color: #f1f5e9; font-weight: 800;
-      text-shadow: 1px 1px #000;
-    }
+    .hud { position: fixed; top: 18px; left: 18px; width: min(250px,45vw); padding: 10px 12px; background: rgba(14,25,17,.88); border: 1px solid #71845a; color: #f1f5e9; font-weight: 800; text-shadow: 1px 1px #000; }
     .health-track { height: 12px; margin-top: 6px; background: #352d2b; border: 1px solid #8a9b79; }
     .health-fill { width: 100%; height: 100%; background: #77c957; transition: width .12s linear; }
-    .death-screen { z-index: 5; background: rgba(255, 0, 0, .75); text-align: center; }
+    .death-screen { z-index: 5; background: rgba(255,0,0,.75); text-align: center; }
     .death-card { display: grid; justify-items: center; gap: 22px; }
-    .death-title {
-      margin: 0; color: #fff; font: 900 clamp(3rem, 10vw, 6rem)/1 monospace;
-      text-shadow: 4px 4px 0 #7a0000;
-    }
-    .back-button {
-      padding: 12px 22px; color: #000; background: #8b1010;
-      border: 2px solid #fff; font: 800 1rem system-ui, sans-serif; cursor: pointer;
-    }
+    .death-title { margin: 0; color: #fff; font: 900 clamp(3rem,10vw,6rem)/1 monospace; text-shadow: 4px 4px 0 #7a0000; }
+    .back-button { padding: 12px 22px; color: #000; background: #8b1010; border: 2px solid #fff; font: 800 1rem system-ui,sans-serif; cursor: pointer; }
     .back-button:hover { background: #a51b1b; }
     .hidden { display: none; }
-    @media (max-width: 600px) {
-      .menu-card { padding: 28px 20px; }
-      .controls { right: 12px; bottom: 12px; font-size: .78rem; }
-      .hud { top: 10px; left: 10px; }
-    }
+    @media (max-width: 600px) { .menu-card { padding: 28px 20px; } .controls { right: 12px; bottom: 12px; font-size: .78rem; } .hud { top: 10px; left: 10px; } }
   </style>
 </head>
 <body>
   <canvas id="game" aria-label="Pixel Survivor game"></canvas>
-
-  <div class="hud hidden" id="hud" aria-live="polite">
-    <span id="healthText">100 hp</span>
-    <div class="health-track"><div class="health-fill" id="healthFill"></div></div>
-  </div>
-
+  <div class="hud hidden" id="hud" aria-live="polite"><span id="healthText">100 hp</span><div class="health-track"><div class="health-fill" id="healthFill"></div></div></div>
   <section class="menu" id="menu" aria-label="Main menu">
-    <div class="menu-card">
-      <h1>Pixel<br />Survivor</h1>
-      <p class="tagline">A zombie is out there. Keep your distance!</p>
-      <div class="menu-buttons">
-        <button id="startButton" type="button">Start Game</button>
-        <button type="button" disabled aria-disabled="true">Weapons <span class="coming-soon">Coming soon</span></button>
-      </div>
-    </div>
-    <aside class="controls">
-      <strong>CONTROLS</strong><br />
-      Move: <strong>W A S D</strong><br />
-      Aim: <strong>Arrow keys</strong> (diagonal too)<br />
-      Shoot: <strong>Space</strong>
-    </aside>
+    <div class="menu-card"><h1>Pixel<br />Survivor</h1><p class="tagline">A zombie is out there. Keep your distance!</p><div class="menu-buttons"><button id="startButton" type="button">Start Game</button><button type="button" disabled aria-disabled="true">Weapons <span class="coming-soon">Coming soon</span></button></div></div>
+    <aside class="controls"><strong>CONTROLS</strong><br />Move: <strong>W A S D</strong><br />Aim: <strong>Arrow keys</strong> (diagonal too)<br />Shoot: <strong>Space</strong></aside>
   </section>
-
-  <section class="death-screen hidden" id="deathScreen" aria-label="You died">
-    <div class="death-card">
-      <h2 class="death-title">You Died</h2>
-      <button class="back-button" id="backButton" type="button">Back to Menu</button>
-    </div>
-  </section>
+  <section class="death-screen hidden" id="deathScreen" aria-label="You died"><div class="death-card"><h2 class="death-title">You Died</h2><button class="back-button" id="backButton" type="button">Back to Menu</button></div></section>
 
   <script>
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
-    ctx.imageSmoothingEnabled = false;
-
     const TILE_SIZE = 16;
-    const ZOMBIE_AGGRO_RANGE = TILE_SIZE * 5;
     const PLAYER_MAX_HP = 100;
-    const ZOMBIE_MAX_HP = 100;
+    const ZOMBIE_AGGRO_RANGE = TILE_SIZE * 5;
+    const ZOMBIE_SPAWN_INTERVAL = 10;
+    const MEDKIT_SPAWN_INTERVAL = 7.5;
+    const MEDKIT_HEAL = 50;
     const ZOMBIE_DAMAGE = 25;
     const BULLET_DAMAGE = 20;
     const ZOMBIE_KNOCKBACK = TILE_SIZE * 2;
-    const ZOMBIE_SPAWN_INTERVAL = 10;
-    const MEDKIT_SPAWN_INTERVAL = 15;
-    const MEDKIT_HEAL = 50;
-    const MAX_MEDKITS = 6;
-    let W = 320;
-    let H = 180;
-    let WORLD_WIDTH = 2400;
-    let WORLD_HEIGHT = 1800;
-    let gameStarted = false;
-    let zombieSpawnTimer = 0;
-    let medkitSpawnTimer = 0;
-
+    let W = 320, H = 180, WORLD_WIDTH = 2400, WORLD_HEIGHT = 1800;
+    let gameStarted = false, zombieSpawnTimer = 0, medkitSpawnTimer = 0;
     const player = { x: 1200, y: 900, speed: 78, hp: PLAYER_MAX_HP, invulnerable: 0 };
-    let zombies = [];
-    let medkits = [];
-    const keys = new Set();
-    const bullets = [];
-    const aim = { x: 1, y: 0 };
-    let lastTime = 0;
-    let lastShot = 0;
-
+    let zombies = [], medkits = [];
+    const bullets = [], keys = new Set(), aim = { x: 1, y: 0 };
+    let lastTime = 0, lastShot = 0, audioContext = null;
     const healthText = document.getElementById("healthText");
     const healthFill = document.getElementById("healthFill");
-    const menu = document.getElementById("menu");
-    const hud = document.getElementById("hud");
+    const menu = document.getElementById("menu"), hud = document.getElementById("hud");
     const deathScreen = document.getElementById("deathScreen");
-
     const plants = [
-      { x: 45, y: 42 }, { x: 263, y: 36 }, { x: 69, y: 146 }, { x: 278, y: 132 },
-      { x: 390, y: 270 }, { x: 610, y: 190 }, { x: 820, y: 350 }, { x: 1250, y: 230 },
-      { x: 1450, y: 510 }, { x: 300, y: 700 }, { x: 560, y: 940 }, { x: 980, y: 820 },
-      { x: 1380, y: 1050 }, { x: 1120, y: 1090 }, { x: 170, y: 1060 }, { x: 760, y: 650 },
-      { x: 1900, y: 300 }, { x: 2150, y: 620 }, { x: 1800, y: 1250 }, { x: 2050, y: 1550 },
-      { x: 450, y: 1500 }, { x: 800, y: 1330 }, { x: 1600, y: 1550 }, { x: 2250, y: 1050 },
-      { x: 1050, y: 450 }, { x: 1550, y: 780 }, { x: 350, y: 1150 }, { x: 1850, y: 950 }
+      {x:45,y:42},{x:263,y:36},{x:69,y:146},{x:278,y:132},{x:390,y:270},{x:610,y:190},{x:820,y:350},{x:1250,y:230},
+      {x:1450,y:510},{x:300,y:700},{x:560,y:940},{x:980,y:820},{x:1380,y:1050},{x:1120,y:1090},{x:170,y:1060},{x:760,y:650},
+      {x:1900,y:300},{x:2150,y:620},{x:1800,y:1250},{x:2050,y:1550},{x:450,y:1500},{x:800,y:1330},{x:1600,y:1550},{x:2250,y:1050},
+      {x:1050,y:450},{x:1550,y:780},{x:350,y:1150},{x:1850,y:950}
     ];
 
     function updateHealthDisplay() {
@@ -154,376 +76,150 @@
       healthFill.style.width = `${player.hp}%`;
       healthFill.style.background = player.hp <= 25 ? "#e34d4d" : player.hp <= 50 ? "#e5a83b" : "#77c957";
     }
-
     function resizeCanvas() {
-      const pixelScale = Math.max(1, Math.floor(Math.min(innerWidth / 320, innerHeight / 180)));
-      W = Math.ceil(innerWidth / pixelScale);
-      H = Math.ceil(innerHeight / pixelScale);
-      canvas.width = W;
-      canvas.height = H;
-      WORLD_WIDTH = Math.max(2400, W + 320);
-      WORLD_HEIGHT = Math.max(1800, H + 240);
+      const scale = Math.max(1, Math.floor(Math.min(innerWidth / 320, innerHeight / 180)));
+      W = Math.ceil(innerWidth / scale); H = Math.ceil(innerHeight / scale);
+      canvas.width = W; canvas.height = H;
+      WORLD_WIDTH = Math.max(2400, W + 320); WORLD_HEIGHT = Math.max(1800, H + 240);
       player.x = Math.min(WORLD_WIDTH - 14, Math.max(14, player.x));
       player.y = Math.min(WORLD_HEIGHT - 14, Math.max(14, player.y));
       ctx.imageSmoothingEnabled = false;
     }
-
-    window.addEventListener("resize", resizeCanvas);
-    resizeCanvas();
-
-    function makeZombie(x, y) {
-      return { x, y, speed: 38, hp: ZOMBIE_MAX_HP, chasing: false, attackCooldown: 0 };
-    }
-
+    addEventListener("resize", resizeCanvas); resizeCanvas();
+    function makeZombie(x, y) { return {x,y,speed:38,hp:100,chasing:false,attackCooldown:0}; }
     function randomWorldPoint() {
-      return {
-        x: TILE_SIZE * 2 + Math.random() * (WORLD_WIDTH - TILE_SIZE * 4),
-        y: TILE_SIZE * 2 + Math.random() * (WORLD_HEIGHT - TILE_SIZE * 4)
-      };
+      return {x:TILE_SIZE*2 + Math.random()*(WORLD_WIDTH-TILE_SIZE*4), y:TILE_SIZE*2 + Math.random()*(WORLD_HEIGHT-TILE_SIZE*4)};
     }
-
     function spawnZombie() {
-      let spawn = null;
-      for (let attempt = 0; attempt < 80; attempt++) {
-        const candidate = randomWorldPoint();
-        const farFromPlayer = Math.hypot(candidate.x - player.x, candidate.y - player.y) > TILE_SIZE * 8;
-        const farFromZombies = zombies.every(z => Math.hypot(candidate.x - z.x, candidate.y - z.y) > TILE_SIZE * 6);
-        if (farFromPlayer && farFromZombies) {
-          spawn = candidate;
-          break;
-        }
+      let point;
+      for (let n=0;n<80;n++) {
+        const p=randomWorldPoint();
+        if (Math.hypot(p.x-player.x,p.y-player.y)>TILE_SIZE*8 && zombies.every(z=>Math.hypot(p.x-z.x,p.y-z.y)>TILE_SIZE*6)) { point=p; break; }
       }
-      if (!spawn) spawn = randomWorldPoint();
-      zombies.push(makeZombie(spawn.x, spawn.y));
+      zombies.push(makeZombie((point||randomWorldPoint()).x,(point||randomWorldPoint()).y));
     }
-
     function spawnMedkit() {
-      if (medkits.length >= MAX_MEDKITS) return;
-      let spawn = null;
-      for (let attempt = 0; attempt < 80; attempt++) {
-        const candidate = randomWorldPoint();
-        const farFromPlayer = Math.hypot(candidate.x - player.x, candidate.y - player.y) > TILE_SIZE * 5;
-        const awayFromMedkits = medkits.every(m => Math.hypot(candidate.x - m.x, candidate.y - m.y) > TILE_SIZE * 5);
-        if (farFromPlayer && awayFromMedkits) {
-          spawn = candidate;
-          break;
-        }
+      let point;
+      for (let n=0;n<80;n++) {
+        const p=randomWorldPoint();
+        if (Math.hypot(p.x-player.x,p.y-player.y)>TILE_SIZE*5 && medkits.every(m=>Math.hypot(p.x-m.x,p.y-m.y)>TILE_SIZE*5)) { point=p; break; }
       }
-      if (!spawn) spawn = randomWorldPoint();
-      medkits.push(spawn);
+      medkits.push(point || randomWorldPoint());
     }
-
+    function playPickupSound() {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) return;
+      try {
+        audioContext ||= new AudioContextClass();
+        if (audioContext.state === "suspended") audioContext.resume();
+        const now = audioContext.currentTime;
+        [660, 880].forEach((frequency, index) => {
+          const oscillator = audioContext.createOscillator();
+          const gain = audioContext.createGain();
+          oscillator.type = "sine";
+          oscillator.frequency.setValueAtTime(frequency, now + index * 0.09);
+          gain.gain.setValueAtTime(0.0001, now + index * 0.09);
+          gain.gain.exponentialRampToValueAtTime(0.16, now + index * 0.09 + 0.015);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + index * 0.09 + 0.18);
+          oscillator.connect(gain); gain.connect(audioContext.destination);
+          oscillator.start(now + index * 0.09); oscillator.stop(now + index * 0.09 + 0.19);
+        });
+      } catch (error) { console.warn("Could not play medkit pickup sound.", error); }
+    }
     function resetGame() {
-      player.x = 1200;
-      player.y = 900;
-      player.hp = PLAYER_MAX_HP;
-      player.invulnerable = 0;
-      zombies = [makeZombie(1304, 900)];
-      medkits = [];
-      zombieSpawnTimer = 0;
-      medkitSpawnTimer = 0;
-      bullets.length = 0;
-      keys.clear();
-      aim.x = 1;
-      aim.y = 0;
-      lastShot = 0;
-      updateHealthDisplay();
+      player.x=1200; player.y=900; player.hp=PLAYER_MAX_HP; player.invulnerable=0;
+      zombies=[makeZombie(1304,900)]; medkits=[]; zombieSpawnTimer=0; medkitSpawnTimer=0;
+      bullets.length=0; keys.clear(); aim.x=1; aim.y=0; lastShot=0; updateHealthDisplay();
     }
-
-    document.getElementById("startButton").addEventListener("click", () => {
-      resetGame();
-      gameStarted = true;
-      menu.classList.add("hidden");
-      deathScreen.classList.add("hidden");
-      hud.classList.remove("hidden");
+    document.getElementById("startButton").addEventListener("click",()=>{
+      resetGame(); gameStarted=true; menu.classList.add("hidden"); deathScreen.classList.add("hidden"); hud.classList.remove("hidden");
     });
-
-    document.getElementById("backButton").addEventListener("click", () => {
-      gameStarted = false;
-      resetGame();
-      deathScreen.classList.add("hidden");
-      hud.classList.add("hidden");
-      menu.classList.remove("hidden");
+    document.getElementById("backButton").addEventListener("click",()=>{
+      gameStarted=false; resetGame(); deathScreen.classList.add("hidden"); hud.classList.add("hidden"); menu.classList.remove("hidden");
     });
-
     function updateAimFromKeys() {
-      let aimX = 0;
-      let aimY = 0;
-      if (keys.has("arrowleft")) aimX -= 1;
-      if (keys.has("arrowright")) aimX += 1;
-      if (keys.has("arrowup")) aimY -= 1;
-      if (keys.has("arrowdown")) aimY += 1;
-      if (aimX || aimY) {
-        const length = Math.hypot(aimX, aimY);
-        aim.x = aimX / length;
-        aim.y = aimY / length;
-      }
+      let x=0,y=0;
+      if(keys.has("arrowleft")) x--; if(keys.has("arrowright")) x++;
+      if(keys.has("arrowup")) y--; if(keys.has("arrowdown")) y++;
+      if(x||y) { const len=Math.hypot(x,y); aim.x=x/len; aim.y=y/len; }
     }
-
-    window.addEventListener("keydown", event => {
-      const key = event.key.toLowerCase();
-      if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(key)) event.preventDefault();
-      if (!gameStarted || player.hp <= 0) return;
-      if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) {
-        keys.add(key);
-        updateAimFromKeys();
-      }
-      if ((key === " " || event.code === "Space") && !event.repeat) shoot();
+    addEventListener("keydown",event=>{
+      const key=event.key.toLowerCase();
+      if(["w","a","s","d","arrowup","arrowdown","arrowleft","arrowright"," "].includes(key)) event.preventDefault();
+      if(!gameStarted||player.hp<=0) return;
+      if(["w","a","s","d","arrowup","arrowdown","arrowleft","arrowright"].includes(key)){keys.add(key);updateAimFromKeys();}
+      if((key===" "||event.code==="Space")&&!event.repeat) shoot();
     });
-
-    window.addEventListener("keyup", event => {
-      keys.delete(event.key.toLowerCase());
-      updateAimFromKeys();
-    });
-    window.addEventListener("blur", () => keys.clear());
-
+    addEventListener("keyup",event=>{keys.delete(event.key.toLowerCase());updateAimFromKeys();});
+    addEventListener("blur",()=>keys.clear());
     function shoot() {
-      const now = performance.now();
-      if (now - lastShot < 180) return;
-      lastShot = now;
-      bullets.push({
-        x: player.x + aim.x * 11,
-        y: player.y + aim.y * 11,
-        vx: aim.x * 190,
-        vy: aim.y * 190,
-        life: 0.65
-      });
+      const now=performance.now(); if(now-lastShot<180) return; lastShot=now;
+      bullets.push({x:player.x+aim.x*11,y:player.y+aim.y*11,vx:aim.x*190,vy:aim.y*190,life:.65});
     }
-
     function damagePlayer(zombie) {
-      if (player.invulnerable > 0 || player.hp <= 0) return;
-      player.hp = Math.max(0, player.hp - ZOMBIE_DAMAGE);
-      player.invulnerable = 0.8;
-      let awayX = player.x - zombie.x;
-      let awayY = player.y - zombie.y;
-      let distance = Math.hypot(awayX, awayY);
-      if (distance === 0) {
-        awayX = 1;
-        awayY = 0;
-        distance = 1;
-      }
-      player.x = Math.max(14, Math.min(WORLD_WIDTH - 14, player.x + (awayX / distance) * ZOMBIE_KNOCKBACK));
-      player.y = Math.max(14, Math.min(WORLD_HEIGHT - 14, player.y + (awayY / distance) * ZOMBIE_KNOCKBACK));
-      updateHealthDisplay();
-      if (player.hp <= 0) {
-        keys.clear();
-        gameStarted = false;
-        deathScreen.classList.remove("hidden");
-      }
+      if(player.invulnerable>0||player.hp<=0) return;
+      player.hp=Math.max(0,player.hp-ZOMBIE_DAMAGE); player.invulnerable=.8;
+      let dx=player.x-zombie.x,dy=player.y-zombie.y,len=Math.hypot(dx,dy)||1;
+      if(!Math.hypot(dx,dy)){dx=1;dy=0;}
+      player.x=Math.max(14,Math.min(WORLD_WIDTH-14,player.x+dx/len*ZOMBIE_KNOCKBACK));
+      player.y=Math.max(14,Math.min(WORLD_HEIGHT-14,player.y+dy/len*ZOMBIE_KNOCKBACK)); updateHealthDisplay();
+      if(player.hp<=0){keys.clear();gameStarted=false;deathScreen.classList.remove("hidden");}
     }
-
     function update(dt) {
-      if (player.invulnerable > 0) player.invulnerable = Math.max(0, player.invulnerable - dt);
-
-      if (gameStarted && player.hp > 0) {
-        let dx = 0;
-        let dy = 0;
-        if (keys.has("a")) dx -= 1;
-        if (keys.has("d")) dx += 1;
-        if (keys.has("w")) dy -= 1;
-        if (keys.has("s")) dy += 1;
-        if (dx && dy) {
-          dx *= Math.SQRT1_2;
-          dy *= Math.SQRT1_2;
+      if(player.invulnerable>0) player.invulnerable=Math.max(0,player.invulnerable-dt);
+      if(gameStarted&&player.hp>0) {
+        let dx=0,dy=0; if(keys.has("a"))dx--;if(keys.has("d"))dx++;if(keys.has("w"))dy--;if(keys.has("s"))dy++;
+        if(dx&&dy){dx*=Math.SQRT1_2;dy*=Math.SQRT1_2;}
+        player.x=Math.max(14,Math.min(WORLD_WIDTH-14,player.x+dx*player.speed*dt));
+        player.y=Math.max(14,Math.min(WORLD_HEIGHT-14,player.y+dy*player.speed*dt));
+        zombieSpawnTimer+=dt; if(zombieSpawnTimer>=ZOMBIE_SPAWN_INTERVAL){zombieSpawnTimer-=ZOMBIE_SPAWN_INTERVAL;spawnZombie();}
+        medkitSpawnTimer+=dt;
+        while(medkitSpawnTimer>=MEDKIT_SPAWN_INTERVAL){medkitSpawnTimer-=MEDKIT_SPAWN_INTERVAL;spawnMedkit();}
+        for(const z of zombies) {
+          if(z.hp<=0) continue; z.attackCooldown=Math.max(0,z.attackCooldown-dt);
+          const vx=player.x-z.x,vy=player.y-z.y,distance=Math.hypot(vx,vy); z.chasing=distance<=ZOMBIE_AGGRO_RANGE;
+          if(distance>18&&z.chasing&&distance>0){z.x+=vx/distance*z.speed*dt;z.y+=vy/distance*z.speed*dt;}
+          else if(distance<=18&&z.attackCooldown<=0){damagePlayer(z);z.attackCooldown=1;if(player.hp<=0)break;}
         }
-        player.x = Math.max(14, Math.min(WORLD_WIDTH - 14, player.x + dx * player.speed * dt));
-        player.y = Math.max(14, Math.min(WORLD_HEIGHT - 14, player.y + dy * player.speed * dt));
-
-        zombieSpawnTimer += dt;
-        if (zombieSpawnTimer >= ZOMBIE_SPAWN_INTERVAL) {
-          zombieSpawnTimer -= ZOMBIE_SPAWN_INTERVAL;
-          spawnZombie();
-        }
-
-        medkitSpawnTimer += dt;
-        if (medkitSpawnTimer >= MEDKIT_SPAWN_INTERVAL) {
-          medkitSpawnTimer -= MEDKIT_SPAWN_INTERVAL;
-          spawnMedkit();
-        }
-
-        for (const zombie of zombies) {
-          if (zombie.hp <= 0) continue;
-          zombie.attackCooldown = Math.max(0, zombie.attackCooldown - dt);
-          const toPlayerX = player.x - zombie.x;
-          const toPlayerY = player.y - zombie.y;
-          const distance = Math.hypot(toPlayerX, toPlayerY);
-          zombie.chasing = distance <= ZOMBIE_AGGRO_RANGE;
-          if (distance > 18 && zombie.chasing && distance > 0) {
-            zombie.x += (toPlayerX / distance) * zombie.speed * dt;
-            zombie.y += (toPlayerY / distance) * zombie.speed * dt;
-          } else if (distance <= 18 && zombie.attackCooldown <= 0) {
-            damagePlayer(zombie);
-            zombie.attackCooldown = 1;
-            if (player.hp <= 0) break;
-          }
-        }
-
-        // Collect a medkit by walking over it; health never exceeds its 100 hp maximum.
-        if (player.hp < PLAYER_MAX_HP) {
-          for (let i = medkits.length - 1; i >= 0; i--) {
-            const medkit = medkits[i];
-            if (Math.hypot(player.x - medkit.x, player.y - medkit.y) < 14) {
-              player.hp = Math.min(PLAYER_MAX_HP, player.hp + MEDKIT_HEAL);
-              medkits.splice(i, 1);
-              updateHealthDisplay();
-            }
+        if(player.hp<PLAYER_MAX_HP) for(let i=medkits.length-1;i>=0;i--) {
+          const m=medkits[i]; if(Math.hypot(player.x-m.x,player.y-m.y)<14) {
+            player.hp=Math.min(PLAYER_MAX_HP,player.hp+MEDKIT_HEAL);medkits.splice(i,1);updateHealthDisplay();playPickupSound();
           }
         }
       }
-
-      for (let i = bullets.length - 1; i >= 0; i--) {
-        const bullet = bullets[i];
-        bullet.x += bullet.vx * dt;
-        bullet.y += bullet.vy * dt;
-        bullet.life -= dt;
-
-        const hitZombie = zombies.find(z => z.hp > 0 && Math.hypot(bullet.x - z.x, bullet.y - z.y) < 11);
-        if (hitZombie) {
-          hitZombie.hp = Math.max(0, hitZombie.hp - BULLET_DAMAGE);
-          bullets.splice(i, 1);
-          continue;
-        }
-
-        if (bullet.life <= 0 || bullet.x < 0 || bullet.x > WORLD_WIDTH || bullet.y < 0 || bullet.y > WORLD_HEIGHT) {
-          bullets.splice(i, 1);
-        }
+      for(let i=bullets.length-1;i>=0;i--) {
+        const b=bullets[i];b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;
+        const hit=zombies.find(z=>z.hp>0&&Math.hypot(b.x-z.x,b.y-z.y)<11);
+        if(hit){hit.hp=Math.max(0,hit.hp-BULLET_DAMAGE);bullets.splice(i,1);continue;}
+        if(b.life<=0||b.x<0||b.x>WORLD_WIDTH||b.y<0||b.y>WORLD_HEIGHT)bullets.splice(i,1);
       }
     }
-
-    function getCamera() {
-      return {
-        x: Math.max(0, Math.min(WORLD_WIDTH - W, player.x - W / 2)),
-        y: Math.max(0, Math.min(WORLD_HEIGHT - H, player.y - H / 2))
-      };
-    }
-
+    function getCamera(){return{x:Math.max(0,Math.min(WORLD_WIDTH-W,player.x-W/2)),y:Math.max(0,Math.min(WORLD_HEIGHT-H,player.y-H/2))};}
     function drawRoom(camera) {
-      ctx.fillStyle = "#526b43";
-      ctx.fillRect(0, 0, W, H);
-      const startX = Math.floor(camera.x / TILE_SIZE) * TILE_SIZE;
-      const startY = Math.floor(camera.y / TILE_SIZE) * TILE_SIZE;
-      for (let worldY = startY; worldY < camera.y + H + TILE_SIZE; worldY += TILE_SIZE) {
-        for (let worldX = startX; worldX < camera.x + W + TILE_SIZE; worldX += TILE_SIZE) {
-          if (((worldX / TILE_SIZE) + (worldY / TILE_SIZE)) % 2 === 0) {
-            ctx.fillStyle = "#587348";
-            ctx.fillRect(worldX - camera.x, worldY - camera.y, TILE_SIZE, TILE_SIZE);
-          }
-        }
-      }
-      ctx.fillStyle = "#26372a";
-      if (camera.y === 0) ctx.fillRect(0, 0, W, 8);
-      if (camera.y + H >= WORLD_HEIGHT) ctx.fillRect(0, H - 8, W, 8);
-      if (camera.x === 0) ctx.fillRect(0, 0, 8, H);
-      if (camera.x + W >= WORLD_WIDTH) ctx.fillRect(W - 8, 0, 8, H);
-
-      for (const plant of plants) {
-        const x = plant.x - camera.x;
-        const y = plant.y - camera.y;
-        if (x < -12 || x > W + 12 || y < -12 || y > H + 12) continue;
-        ctx.fillStyle = "#304733";
-        ctx.fillRect(x - 4, y + 3, 10, 5);
-        ctx.fillStyle = "#83a95b";
-        ctx.fillRect(x, y - 3, 4, 8);
-        ctx.fillRect(x - 4, y, 4, 4);
-        ctx.fillRect(x + 4, y - 1, 4, 4);
-        ctx.fillStyle = "#b1c96b";
-        ctx.fillRect(x, y - 5, 3, 3);
-      }
+      ctx.fillStyle="#526b43";ctx.fillRect(0,0,W,H);
+      const sx=Math.floor(camera.x/TILE_SIZE)*TILE_SIZE,sy=Math.floor(camera.y/TILE_SIZE)*TILE_SIZE;
+      for(let wy=sy;wy<camera.y+H+TILE_SIZE;wy+=TILE_SIZE)for(let wx=sx;wx<camera.x+W+TILE_SIZE;wx+=TILE_SIZE)
+        if(((wx/TILE_SIZE)+(wy/TILE_SIZE))%2===0){ctx.fillStyle="#587348";ctx.fillRect(wx-camera.x,wy-camera.y,TILE_SIZE,TILE_SIZE);}
+      ctx.fillStyle="#26372a";
+      if(camera.y===0)ctx.fillRect(0,0,W,8);if(camera.y+H>=WORLD_HEIGHT)ctx.fillRect(0,H-8,W,8);
+      if(camera.x===0)ctx.fillRect(0,0,8,H);if(camera.x+W>=WORLD_WIDTH)ctx.fillRect(W-8,0,8,H);
+      for(const p of plants){const x=p.x-camera.x,y=p.y-camera.y;if(x< -12||x>W+12||y< -12||y>H+12)continue;
+        ctx.fillStyle="#304733";ctx.fillRect(x-4,y+3,10,5);ctx.fillStyle="#83a95b";ctx.fillRect(x,y-3,4,8);ctx.fillRect(x-4,y,4,4);ctx.fillRect(x+4,y-1,4,4);ctx.fillStyle="#b1c96b";ctx.fillRect(x,y-5,3,3);}
     }
-
-    function drawMedkits(camera) {
-      for (const medkit of medkits) {
-        const x = Math.round(medkit.x - camera.x);
-        const y = Math.round(medkit.y - camera.y);
-        if (x < -12 || x > W + 12 || y < -12 || y > H + 12) continue;
-        // Pixel-art white first-aid pack with a red cross.
-        ctx.fillStyle = "#263329";
-        ctx.fillRect(x - 7, y - 5, 15, 12);
-        ctx.fillStyle = "#f2f1df";
-        ctx.fillRect(x - 6, y - 6, 12, 10);
-        ctx.fillStyle = "#d7433e";
-        ctx.fillRect(x - 2, y - 4, 4, 7);
-        ctx.fillRect(x - 4, y - 2, 8, 3);
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(x - 2, y - 8, 4, 2);
-      }
-    }
-
-    function drawCharacter(x, y, isZombie = false) {
-      ctx.fillStyle = isZombie ? "#263329" : "#273329";
-      ctx.fillRect(Math.round(x - 6), Math.round(y + 5), 13, 4);
-      ctx.fillStyle = isZombie ? "#3a3430" : "#342d38";
-      ctx.fillRect(x - 5, y + 2, 4, 6);
-      ctx.fillRect(x + 2, y + 2, 4, 6);
-      ctx.fillStyle = isZombie ? "#59604a" : "#315d91";
-      ctx.fillRect(x - 7, y - 5, 14, 11);
-      ctx.fillStyle = isZombie ? "#70764d" : "#497db2";
-      ctx.fillRect(x - 5, y - 7, 10, 10);
-      ctx.fillStyle = isZombie ? "#79a64d" : "#d9a77b";
-      ctx.fillRect(x - 4, y - 13, 9, 8);
-      ctx.fillStyle = isZombie ? "#405a38" : "#62443d";
-      ctx.fillRect(x - 4, y - 14, 9, 3);
-      if (isZombie) {
-        ctx.fillStyle = "#d7e78a";
-        ctx.fillRect(x - 2, y - 10, 2, 2);
-        ctx.fillRect(x + 2, y - 10, 2, 2);
-      }
-    }
-
-    function drawPlayer(camera) {
-      const x = player.x - camera.x;
-      const y = player.y - camera.y;
-      if (player.invulnerable > 0 && Math.floor(player.invulnerable * 12) % 2 === 0) return;
-      drawCharacter(x, y);
-      ctx.save();
-      ctx.translate(x, y - 1);
-      ctx.rotate(Math.atan2(aim.y, aim.x));
-      ctx.fillStyle = "#252a30";
-      ctx.fillRect(3, -2, 12, 4);
-      ctx.fillStyle = "#adb6aa";
-      ctx.fillRect(8, -3, 9, 2);
-      ctx.fillStyle = "#7e8d83";
-      ctx.fillRect(5, 2, 3, 4);
-      ctx.restore();
-    }
-
-    function drawZombies(camera) {
-      for (const zombie of zombies) {
-        if (zombie.hp <= 0) continue;
-        const x = zombie.x - camera.x;
-        const y = zombie.y - camera.y;
-        if (x < -24 || x > W + 24 || y < -24 || y > H + 24) continue;
-        drawCharacter(x, y, true);
-      }
-    }
-
-    function drawBullets(camera) {
-      for (const bullet of bullets) {
-        const x = bullet.x - camera.x;
-        const y = bullet.y - camera.y;
-        if (x < -4 || x > W + 4 || y < -4 || y > H + 4) continue;
-        ctx.fillStyle = "#ffe68a";
-        ctx.fillRect(Math.round(x) - 2, Math.round(y) - 1, 4, 3);
-      }
-    }
-
-    function draw() {
-      const camera = getCamera();
-      drawRoom(camera);
-      drawMedkits(camera);
-      drawZombies(camera);
-      drawBullets(camera);
-      drawPlayer(camera);
-    }
-
-    function frame(time) {
-      const dt = Math.min((time - lastTime) / 1000 || 0, 0.05);
-      lastTime = time;
-      update(dt);
-      draw();
-      requestAnimationFrame(frame);
-    }
-
+    function drawMedkits(camera){for(const m of medkits){const x=Math.round(m.x-camera.x),y=Math.round(m.y-camera.y);if(x< -12||x>W+12||y< -12||y>H+12)continue;
+      ctx.fillStyle="#263329";ctx.fillRect(x-7,y-5,15,12);ctx.fillStyle="#f2f1df";ctx.fillRect(x-6,y-6,12,10);ctx.fillStyle="#d7433e";ctx.fillRect(x-2,y-4,4,7);ctx.fillRect(x-4,y-2,8,3);ctx.fillStyle="#fff";ctx.fillRect(x-2,y-8,4,2);}}
+    function drawCharacter(x,y,isZombie=false){
+      ctx.fillStyle=isZombie?"#263329":"#273329";ctx.fillRect(Math.round(x-6),Math.round(y+5),13,4);
+      ctx.fillStyle=isZombie?"#3a3430":"#342d38";ctx.fillRect(x-5,y+2,4,6);ctx.fillRect(x+2,y+2,4,6);
+      ctx.fillStyle=isZombie?"#59604a":"#315d91";ctx.fillRect(x-7,y-5,14,11);ctx.fillStyle=isZombie?"#70764d":"#497db2";ctx.fillRect(x-5,y-7,10,10);
+      ctx.fillStyle=isZombie?"#79a64d":"#d9a77b";ctx.fillRect(x-4,y-13,9,8);ctx.fillStyle=isZombie?"#405a38":"#62443d";ctx.fillRect(x-4,y-14,9,3);
+      if(isZombie){ctx.fillStyle="#d7e78a";ctx.fillRect(x-2,y-10,2,2);ctx.fillRect(x+2,y-10,2,2);}}
+    function drawZombies(camera){for(const z of zombies){if(z.hp<=0)continue;const x=z.x-camera.x,y=z.y-camera.y;if(x< -24||x>W+24||y< -24||y>H+24)continue;drawCharacter(x,y,true);}}
+    function drawBullets(camera){for(const b of bullets){const x=b.x-camera.x,y=b.y-camera.y;if(x< -4||x>W+4||y< -4||y>H+4)continue;ctx.fillStyle="#ffe68a";ctx.fillRect(Math.round(x)-2,Math.round(y)-1,4,3);}}
+    function drawPlayer(camera){const x=player.x-camera.x,y=player.y-camera.y;if(player.invulnerable>0&&Math.floor(player.invulnerable*12)%2===0)return;drawCharacter(x,y);
+      ctx.save();ctx.translate(x,y-1);ctx.rotate(Math.atan2(aim.y,aim.x));ctx.fillStyle="#252a30";ctx.fillRect(3,-2,12,4);ctx.fillStyle="#adb6aa";ctx.fillRect(8,-3,9,2);ctx.fillStyle="#7e8d83";ctx.fillRect(5,2,3,4);ctx.restore();}
+    function draw(){const camera=getCamera();drawRoom(camera);drawMedkits(camera);drawZombies(camera);drawBullets(camera);drawPlayer(camera);}
+    function frame(time){const dt=Math.min((time-lastTime)/1000||0,.05);lastTime=time;update(dt);draw();requestAnimationFrame(frame);}
     requestAnimationFrame(frame);
   </script>
 </body>
