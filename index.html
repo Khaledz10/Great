@@ -12,9 +12,7 @@
     .menu, .death-screen {
       position: fixed; inset: 0; display: grid; place-items: center; padding: 24px;
     }
-    .menu {
-      background: linear-gradient(135deg, rgba(10, 20, 15, .88), rgba(15, 25, 20, .72));
-    }
+    .menu { background: linear-gradient(135deg, rgba(10, 20, 15, .88), rgba(15, 25, 20, .72)); }
     .menu-card {
       width: min(440px, 100%); padding: 36px; text-align: center;
       background: rgba(25, 39, 29, .96); border: 3px solid #71845a;
@@ -51,9 +49,7 @@
     }
     .health-track { height: 12px; margin-top: 6px; background: #352d2b; border: 1px solid #8a9b79; }
     .health-fill { width: 100%; height: 100%; background: #77c957; transition: width .12s linear; }
-    .death-screen {
-      z-index: 5; background: rgba(255, 0, 0, .75); text-align: center;
-    }
+    .death-screen { z-index: 5; background: rgba(255, 0, 0, .75); text-align: center; }
     .death-card { display: grid; justify-items: center; gap: 22px; }
     .death-title {
       margin: 0; color: #fff; font: 900 clamp(3rem, 10vw, 6rem)/1 monospace;
@@ -116,14 +112,16 @@
     const ZOMBIE_DAMAGE = 25;
     const BULLET_DAMAGE = 20;
     const ZOMBIE_KNOCKBACK = TILE_SIZE * 2;
+    const ZOMBIE_SPAWN_INTERVAL = 10;
     let W = 320;
     let H = 180;
     let WORLD_WIDTH = 2400;
     let WORLD_HEIGHT = 1800;
     let gameStarted = false;
+    let zombieSpawnTimer = 0;
 
     const player = { x: 1200, y: 900, speed: 78, hp: PLAYER_MAX_HP, invulnerable: 0 };
-    const zombie = { x: 1304, y: 900, speed: 38, hp: ZOMBIE_MAX_HP, chasing: false, attackCooldown: 0 };
+    let zombies = [];
     const keys = new Set();
     const bullets = [];
     const aim = { x: 1, y: 0 };
@@ -168,16 +166,44 @@
     window.addEventListener("resize", resizeCanvas);
     resizeCanvas();
 
+    function makeZombie(x, y) {
+      return { x, y, speed: 38, hp: ZOMBIE_MAX_HP, chasing: false, attackCooldown: 0 };
+    }
+
+    function spawnZombie() {
+      // Choose a random map location far enough from the player and existing zombies.
+      // Reject recent spawn spots too, so each wave appears in a different place.
+      let spawn = null;
+      for (let attempt = 0; attempt < 80; attempt++) {
+        const candidate = {
+          x: TILE_SIZE * 2 + Math.random() * (WORLD_WIDTH - TILE_SIZE * 4),
+          y: TILE_SIZE * 2 + Math.random() * (WORLD_HEIGHT - TILE_SIZE * 4)
+        };
+        const farFromPlayer = Math.hypot(candidate.x - player.x, candidate.y - player.y) > TILE_SIZE * 8;
+        const farFromZombies = zombies.every(z => Math.hypot(candidate.x - z.x, candidate.y - z.y) > TILE_SIZE * 6);
+        if (farFromPlayer && farFromZombies) {
+          spawn = candidate;
+          break;
+        }
+      }
+
+      // Fallback still picks a valid random position if the map gets crowded.
+      if (!spawn) {
+        spawn = {
+          x: TILE_SIZE * 2 + Math.random() * (WORLD_WIDTH - TILE_SIZE * 4),
+          y: TILE_SIZE * 2 + Math.random() * (WORLD_HEIGHT - TILE_SIZE * 4)
+        };
+      }
+      zombies.push(makeZombie(spawn.x, spawn.y));
+    }
+
     function resetGame() {
       player.x = 1200;
       player.y = 900;
       player.hp = PLAYER_MAX_HP;
       player.invulnerable = 0;
-      zombie.x = 1304;
-      zombie.y = 900;
-      zombie.hp = ZOMBIE_MAX_HP;
-      zombie.chasing = false;
-      zombie.attackCooldown = 0;
+      zombies = [makeZombie(1304, 900)];
+      zombieSpawnTimer = 0;
       bullets.length = 0;
       keys.clear();
       aim.x = 1;
@@ -246,11 +272,10 @@
       });
     }
 
-    function damagePlayer() {
+    function damagePlayer(zombie) {
       if (player.invulnerable > 0 || player.hp <= 0) return;
       player.hp = Math.max(0, player.hp - ZOMBIE_DAMAGE);
       player.invulnerable = 0.8;
-
       let awayX = player.x - zombie.x;
       let awayY = player.y - zombie.y;
       let distance = Math.hypot(awayX, awayY);
@@ -262,7 +287,6 @@
       player.x = Math.max(14, Math.min(WORLD_WIDTH - 14, player.x + (awayX / distance) * ZOMBIE_KNOCKBACK));
       player.y = Math.max(14, Math.min(WORLD_HEIGHT - 14, player.y + (awayY / distance) * ZOMBIE_KNOCKBACK));
       updateHealthDisplay();
-
       if (player.hp <= 0) {
         keys.clear();
         gameStarted = false;
@@ -287,19 +311,26 @@
         player.x = Math.max(14, Math.min(WORLD_WIDTH - 14, player.x + dx * player.speed * dt));
         player.y = Math.max(14, Math.min(WORLD_HEIGHT - 14, player.y + dy * player.speed * dt));
 
-        if (zombie.hp > 0) {
+        zombieSpawnTimer += dt;
+        if (zombieSpawnTimer >= ZOMBIE_SPAWN_INTERVAL) {
+          zombieSpawnTimer -= ZOMBIE_SPAWN_INTERVAL;
+          spawnZombie();
+        }
+
+        for (const zombie of zombies) {
+          if (zombie.hp <= 0) continue;
           zombie.attackCooldown = Math.max(0, zombie.attackCooldown - dt);
           const toPlayerX = player.x - zombie.x;
           const toPlayerY = player.y - zombie.y;
           const distance = Math.hypot(toPlayerX, toPlayerY);
           zombie.chasing = distance <= ZOMBIE_AGGRO_RANGE;
-
           if (distance > 18 && zombie.chasing && distance > 0) {
             zombie.x += (toPlayerX / distance) * zombie.speed * dt;
             zombie.y += (toPlayerY / distance) * zombie.speed * dt;
           } else if (distance <= 18 && zombie.attackCooldown <= 0) {
-            damagePlayer();
+            damagePlayer(zombie);
             zombie.attackCooldown = 1;
+            if (player.hp <= 0) break;
           }
         }
       }
@@ -310,8 +341,9 @@
         bullet.y += bullet.vy * dt;
         bullet.life -= dt;
 
-        if (zombie.hp > 0 && Math.hypot(bullet.x - zombie.x, bullet.y - zombie.y) < 11) {
-          zombie.hp = Math.max(0, zombie.hp - BULLET_DAMAGE);
+        const hitZombie = zombies.find(z => z.hp > 0 && Math.hypot(bullet.x - z.x, bullet.y - z.y) < 11);
+        if (hitZombie) {
+          hitZombie.hp = Math.max(0, hitZombie.hp - BULLET_DAMAGE);
           bullets.splice(i, 1);
           continue;
         }
@@ -401,12 +433,14 @@
       ctx.restore();
     }
 
-    function drawZombie(camera) {
-      if (zombie.hp <= 0) return;
-      const x = zombie.x - camera.x;
-      const y = zombie.y - camera.y;
-      if (x < -24 || x > W + 24 || y < -24 || y > H + 24) return;
-      drawCharacter(x, y, true);
+    function drawZombies(camera) {
+      for (const zombie of zombies) {
+        if (zombie.hp <= 0) continue;
+        const x = zombie.x - camera.x;
+        const y = zombie.y - camera.y;
+        if (x < -24 || x > W + 24 || y < -24 || y > H + 24) continue;
+        drawCharacter(x, y, true);
+      }
     }
 
     function drawBullets(camera) {
@@ -422,7 +456,7 @@
     function draw() {
       const camera = getCamera();
       drawRoom(camera);
-      drawZombie(camera);
+      drawZombies(camera);
       drawBullets(camera);
       drawPlayer(camera);
     }
